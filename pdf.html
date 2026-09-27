@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF 智能切割 · 自动识别疾病</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#fff; --line:#e4e7ec; --text:#1f2937; --muted:#6b7280;
+    --primary:#4f46e5; --primary-dark:#4338ca; --danger:#dc2626; --success:#16a34a;
+    --warn:#d97706; --info:#0284c7;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;}
+  .container{max-width:1280px;margin:0 auto;padding:28px 16px 80px}
+  header h1{font-size:22px;margin:0 0 6px}
+  header .sub{color:var(--muted);font-size:13px;margin:0 0 22px}
+
+  .dropzone{border:2px dashed #cbd5e1;border-radius:16px;background:#fff;
+    padding:50px 20px;text-align:center;cursor:pointer;transition:.2s}
+  .dropzone:hover,.dropzone.over{border-color:var(--primary);background:#eef2ff}
+  .dz-icon{font-size:42px;margin-bottom:10px}
+  .dropzone p{margin:0;color:var(--muted);font-size:14px}
+  .dropzone strong{color:var(--primary)}
+
+  .workspace{display:block}
+  .toolbar{display:flex;align-items:center;gap:12px;justify-content:space-between;
+    background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px 16px;margin-bottom:14px}
+  .file-info{display:flex;flex-direction:column;gap:2px;min-width:0}
+  .file-info #fileName{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .muted{color:var(--muted);font-size:12px}
+
+  .tabs{display:flex;gap:6px;background:#f1f3f7;border-radius:10px;padding:4px;margin-bottom:14px;max-width:560px}
+  .tab{flex:1;border:none;background:transparent;padding:7px 8px;border-radius:7px;
+    font-size:13px;cursor:pointer;color:var(--muted);font-family:inherit;transition:.15s}
+  .tab.active{background:#fff;color:var(--primary);font-weight:600;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+
+  .grid{display:grid;grid-template-columns:1fr 340px;gap:14px;align-items:start}
+  @media(max-width:900px){ .grid{grid-template-columns:1fr} }
+
+  .panel{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}
+  .panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .panel h2{font-size:15px;margin:0;display:flex;align-items:center;gap:8px}
+  .badge{background:var(--primary);color:#fff;border-radius:999px;font-size:11px;padding:2px 8px;font-weight:600}
+  .badge.warn{background:var(--warn)}
+  .status{font-size:12px;color:var(--muted)}
+  .quick{display:flex;gap:6px;flex-wrap:wrap}
+  .quick button{border:1px solid var(--line);background:#fff;border-radius:8px;
+    padding:4px 9px;font-size:12px;cursor:pointer;color:var(--muted);transition:.15s}
+  .quick button:hover{border-color:var(--primary);color:var(--primary)}
+
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:6px}
+  .field input[type=text],.field input[type=number],.field select{
+    width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
+    font-size:14px;font-family:inherit;color:var(--text);background:#fff;outline:none;transition:.15s}
+  .field input:focus,.field select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.12)}
+  .hint{font-size:12px;color:var(--muted);margin:6px 0 0}
+
+  .check{display:flex;align-items:flex-start;gap:8px;font-size:13px;margin-bottom:12px;cursor:pointer;line-height:1.4}
+  .check input{width:16px;height:16px;accent-color:var(--primary);flex-shrink:0;margin-top:2px}
+  .check .desc{color:var(--muted);font-size:11px;display:block;margin-top:2px}
+
+  .btn{border:none;border-radius:10px;padding:11px 14px;font-size:14px;cursor:pointer;
+    font-family:inherit;transition:.15s;width:100%;margin-bottom:9px;font-weight:600}
+  .btn:last-child{margin-bottom:0}
+  .btn.primary{background:var(--primary);color:#fff}
+  .btn.primary:hover{background:var(--primary-dark)}
+  .btn.success{background:var(--success);color:#fff}
+  .btn.success:hover{background:#15803d}
+  .btn.danger{background:#fee2e2;color:var(--danger)}
+  .btn.danger:hover{background:#fecaca}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--text);width:auto;margin:0;font-weight:500}
+  .btn.ghost:hover{border-color:var(--primary);color:var(--primary)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  .hidden{display:none !important}
+
+  /* 疾病识别列表 */
+  .auto-list{max-height:62vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px;background:#fafafa}
+  .auto-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;font-size:13px;transition:.1s}
+  .auto-item:hover{background:#eef2ff}
+  .auto-item input[type=checkbox]{accent-color:var(--primary);flex-shrink:0;width:16px;height:16px}
+  .auto-item .page-tag{background:#e0e7ff;color:#4338ca;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;flex-shrink:0;min-width:36px;text-align:center}
+  .auto-item .level-tag{border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;flex-shrink:0;white-space:nowrap}
+  .level-1{background:#fee2e2;color:#991b1b}
+  .level-2{background:#fed7aa;color:#9a3412}
+  .level-3{background:#fef3c7;color:#92400e}
+  .level-4{background:#dbeafe;color:#1e40af}
+  .level-5{background:#e0e7ff;color:#4338ca}
+  .level-0{background:#f3f4f6;color:#6b7280}
+  .auto-item input.title-input{flex:1;border:1px solid transparent;background:transparent;
+    padding:3px 6px;border-radius:5px;font-size:13px;font-family:inherit;color:var(--text);outline:none;min-width:60px}
+  .auto-item input.title-input:hover{border-color:var(--line);background:#fff}
+  .auto-item input.title-input:focus{border-color:var(--primary);background:#fff}
+  .auto-item .del-btn{border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:15px;padding:2px 6px;border-radius:4px}
+  .auto-item .del-btn:hover{background:#fee2e2;color:var(--danger)}
+  .auto-item .score-tag{font-size:10px;color:var(--muted);flex-shrink:0;padding:0 4px}
+
+  .level-filter-bar{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+  .level-filter-bar button{border:1px solid var(--line);background:#fff;border-radius:20px;
+    padding:3px 10px;font-size:12px;cursor:pointer;color:var(--muted);transition:.15s;font-family:inherit}
+  .level-filter-bar button:hover{border-color:var(--primary);color:var(--primary)}
+  .level-filter-bar button.active{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+
+  .divider{height:1px;background:var(--line);margin:14px 0}
+
+  #overlay{position:fixed;inset:0;background:rgba(255,255,255,.72);backdrop-filter:blur(2px);
+    display:none;place-items:center;z-index:50}
+  #overlay.on{display:grid}
+  .spinner{width:38px;height:38px;border:3px solid #e0e0e0;border-top-color:var(--primary);
+    border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #overlayText{margin-top:12px;font-size:13px;color:var(--muted);text-align:center}
+
+  #toast{position:fixed;left:50%;bottom:32px;transform:translate(-50%,20px);
+    background:#1f2937;color:#fff;padding:11px 20px;border-radius:10px;font-size:13px;
+    opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:90vw;text-align:center}
+  #toast.on{opacity:1;transform:translate(-50%,0)}
+
+  /* 手动添加弹窗 */
+  .modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;place-items:center;z-index:70}
+  .modal-mask.on{display:grid}
+  .modal{background:#fff;border-radius:12px;padding:20px;min-width:320px;max-width:90vw;box-shadow:0 20px 40px rgba(0,0,0,.15)}
+  .modal h3{margin:0 0 14px;font-size:16px}
+  .modal .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+  .modal .actions button{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:13px;font-family:inherit;font-weight:600}
+  .modal .actions .cancel{background:#f3f4f6;color:var(--text)}
+  .modal .actions .ok{background:var(--primary);color:#fff}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>📚 PDF 智能切割 · 自动识别疾病</h1>
+    <p class="sub">无需书签，自动分析文本层的字号、编号、位置，识别疾病标题并拆分。全程本地处理，文件不上传。</p>
+  </header>
+
+  <section id="dropZone" class="dropzone">
+    <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+    <div class="dz-icon">📄</div>
+    <p><strong>点击选择</strong> 或拖拽 PDF 文件到这里</p>
+    <p class="hint" style="margin-top:8px">建议使用文字版（非扫描版）人卫教材 PDF</p>
+  </section>
+
+  <section id="workspace" class="workspace hidden">
+    <div class="toolbar">
+      <div class="file-info">
+        <span id="fileName"></span>
+        <span id="fileMeta" class="muted"></span>
+      </div>
+      <button id="resetBtn" class="btn ghost">重新选择</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="auto">🎯 自动识别疾病</button>
+      <button class="tab" data-tab="manual">✂️ 手动切割</button>
+    </div>
+
+    <!-- 自动识别面板 -->
+    <div id="paneAuto">
+      <div class="grid">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>识别结果 <span id="autoCount" class="badge">0</span></h2>
+            <div class="quick">
+              <button data-auto-act="all">全选</button>
+              <button data-auto-act="none">清空</button>
+              <button data-auto-act="invert">反选</button>
+              <button id="btnAddManual">+ 手动添加</button>
+            </div>
+          </div>
+          <div id="autoHint" class="muted" style="margin-bottom:10px;font-size:12px"></div>
+          <div id="levelFilterBar" class="level-filter-bar"></div>
+          <div id="autoEmpty" class="muted" style="padding:20px;text-align:center">
+            还没有识别结果。请点击右侧“开始识别”。
+          </div>
+          <div class="auto-list hidden" id="autoList"></div>
+        </div>
+
+        <aside class="panel">
+          <h2 style="margin-top:0">识别设置</h2>
+          <div class="field">
+            <label for="autoSensitivity">灵敏度</label>
+            <select id="autoSensitivity">
+              <option value="strict">严格（只挑明显的标题）</option>
+              <option value="medium" selected>中等（推荐）</option>
+              <option value="loose">宽松（宁可多识别）</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="autoMaxLevel">最大层级深度</label>
+            <select id="autoMaxLevel">
+              <option value="3">识别到“一、”级（3 层）</option>
+              <option value="4" selected>识别到“（一）”级（4 层）</option>
+              <option value="5">识别到“1.”级（5 层）</option>
+            </select>
+            <p class="hint">限制越深，识别结果越细</p>
+          </div>
+          <button id="btnAutoDetect" class="btn primary">🔍 开始识别</button>
+          <p class="hint" id="detectStatus" style="margin-top:8px"></p>
+
+          <div class="divider"></div>
+          <h2>拆分设置</h2>
+
+          <label class="check">
+            <input type="checkbox" id="autoTitleTop" checked>
+            <span>疾病标题紧贴页面顶部
+              <span class="desc">自动裁掉标题上方的页眉、页码、上一疾病残留</span>
+            </span>
+          </label>
+
+          <div class="field" id="autoMarginField">
+            <label for="autoTopMargin">标题上方留白</label>
+            <input type="number" id="autoTopMargin" min="0" max="80" value="10">
+            <p class="hint">数值越小越贴近页顶，建议 5~20</p>
+          </div>
+
+          <label class="check">
+            <input type="checkbox" id="autoCropSame" checked>
+            <span>同页多疾病智能裁切
+              <span class="desc">同一页有多个疾病时，按标题位置切分页面</span>
+            </span>
+          </label>
+
+          <label class="check">
+            <input type="checkbox" id="autoZip" checked>
+            <span>打包为 ZIP 下载</span>
+          </label>
+
+          <button id="btnAutoSplit" class="btn success" disabled>🚀 按识别结果拆分</button>
+          <p class="hint" id="autoPreview" style="margin-top:10px"></p>
+        </aside>
+      </div>
+    </div>
+
+    <!-- 手动切割面板 -->
+    <div id="paneManual" class="hidden">
+      <div class="grid">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>页面 <span id="selCount" class="badge">0</span></h2>
+            <div class="quick">
+              <button data-act="all">全选</button>
+              <button data-act="none">清空</button>
+              <button data-act="invert">反选</button>
+              <button data-act="odd">奇数页</button>
+              <button data-act="even">偶数页</button>
+            </div>
+          </div>
+          <div id="status" class="status"></div>
+          <div id="thumbs" class="thumbs"></div>
+        </div>
+        <aside class="panel">
+          <div class="field">
+            <label for="rangeInput">页面范围</label>
+            <input id="rangeInput" type="text" placeholder="例如：1-3,5,8-10">
+            <p class="hint">留空则使用左侧勾选的页面</p>
+          </div>
+          <button id="btnExtract" class="btn primary">提取所选页面</button>
+          <button id="btnRemove" class="btn danger">删除所选页面</button>
+          <div class="divider"></div>
+          <h2 style="font-size:15px;margin:0 0 10px">按页数批量拆分</h2>
+          <div class="field">
+            <label for="splitN">每份文件包含页数</label>
+            <input id="splitN" type="number" min="1" value="1">
+          </div>
+          <label class="check"><input type="checkbox" id="splitZip" checked> 打包为 ZIP 下载</label>
+          <button id="btnSplit" class="btn primary">开始拆分</button>
+        </aside>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- 手动添加弹窗 -->
+<div id="addModalMask" class="modal-mask">
+  <div class="modal">
+    <h3>手动添加疾病</h3>
+    <div class="field">
+      <label>所在页码</label>
+      <input type="number" id="addPage" min="1" value="1">
+    </div>
+    <div class="field">
+      <label>疾病名称</label>
+      <input type="text" id="addTitle" placeholder="例如：急性上呼吸道感染">
+    </div>
+    <div class="field">
+      <label>层级（可选）</label>
+      <select id="addLevel">
+        <option value="3">3 级（一、）</option>
+        <option value="4" selected>4 级（（一））</option>
+        <option value="5">5 级（1.）</option>
+        <option value="0">其他</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button class="cancel" id="addCancel">取消</button>
+      <button class="ok" id="addConfirm">添加</button>
+    </div>
+  </div>
+</div>
+
+<div id="overlay"><div><div class="spinner"></div><div id="overlayText">处理中…</div></div></div>
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  const { PDFDocument } = PDFLib;
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  const $ = (id) => document.getElementById(id);
+  const dropZone = $('dropZone'), fileInput = $('fileInput'), workspace = $('workspace');
+  const overlay = $('overlay'), overlayText = $('overlayText'), toastEl = $('toast');
+
+  let pdfBytes = null;
+  let pdfDoc = null;
+  let pageCount = 0;
+  let currentFileName = '';
+  let pageHeights = {};         // 每页高度（PDF 单位）
+  let allLines = [];            // 全部文本行
+  let detected = [];            // 识别出的疾病候选（可编辑）
+  let selectedDetected = new Set(); // 选中集合
+  let currentLevelFilter = 'all';
+
+  /* ---------------- 通用工具 ---------------- */
+  function toast(msg, ms = 2600) {
+    toastEl.textContent = msg;
+    toastEl.classList.add('on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => toastEl.classList.remove('on'), ms);
+  }
+  function busy(on, text = '处理中…') {
+    overlayText.textContent = text;
+    overlay.classList.toggle('on', on);
+  }
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+  }
+  function sanitize(name) {
+    return String(name).replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim().slice(0, 100) || 'document';
+  }
+  function allPages() {
+    return Array.from({ length: pageCount }, (_, i) => i + 1);
+  }
+  function download(data, filename) {
+    const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 8000);
+  }
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  /* ---------------- 文件加载 ---------------- */
+  ['dragenter', 'dragover'].forEach(ev =>
+    dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('over'); })
+  );
+  ['dragleave', 'drop'].forEach(ev =>
+    dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('over'); })
+  );
+  dropZone.addEventListener('drop', e => {
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+  dropZone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    fileInput.value = '';
+  });
+
+  $('resetBtn').addEventListener('click', reset);
+
+  function reset() {
+    pdfBytes = null;
+    if (pdfDoc) { try { pdfDoc.destroy(); } catch (e) {} }
+    pdfDoc = null; pageCount = 0; currentFileName = '';
+    pageHeights = {}; allLines = [];
+    detected = []; selectedDetected = new Set();
+    workspace.classList.add('hidden');
+    dropZone.classList.remove('hidden');
+    $('autoList').innerHTML = '';
+    $('autoEmpty').classList.remove('hidden');
+    $('autoList').classList.add('hidden');
+    $('detectStatus').textContent = '';
+    $('autoPreview').textContent = '';
+    $('btnAutoSplit').disabled = true;
+    $('autoCount').textContent = '0';
+    $('levelFilterBar').innerHTML = '';
+  }
+
+  async function handleFile(file) {
+    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+      toast('请选择 PDF 文件'); return;
+    }
+    busy(true, '正在读取 PDF…');
+    try {
+      const buf = await file.arrayBuffer();
+      pdfBytes = buf;
+      pdfDoc = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+      pageCount = pdfDoc.numPages;
+      currentFileName = file.name;
+
+      $('fileName').textContent = file.name;
+      $('fileMeta').textContent = `${pageCount} 页 · ${formatSize(file.size)}`;
+
+      dropZone.classList.add('hidden');
+      workspace.classList.remove('hidden');
+
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelector('.tab[data-tab="auto"]').classList.add('active');
+      $('paneAuto').classList.remove('hidden');
+      $('paneManual').classList.add('hidden');
+
+      // 自动开始识别
+      await runDetection();
+    } catch (err) {
+      console.error(err);
+      toast('无法读取该 PDF：' + (err && err.message ? err.message : err));
+      reset();
+    } finally {
+      busy(false);
+    }
+  }
+
+  /* ---------------- 文本提取 ---------------- */
+  async function extractAllLines() {
+    allLines = [];
+    pageHeights = {};
+
+    for (let p = 1; p <= pageCount; p++) {
+      overlayText.textContent = `正在提取文本 ${p}/${pageCount}`;
+      const page = await pdfDoc.getPage(p);
+      const vp = page.getViewport({ scale: 1 });
+      pageHeights[p] = vp.height;
+
+      let tc;
+      try {
+        tc = await page.getTextContent();
+      } catch (e) { continue; }
+
+      const items = tc.items.filter(i => i.str && i.str.trim());
+      if (!items.length) continue;
+
+      // 每个 item 带上 y 坐标
+      const withY = items.map(i => ({
+        str: i.str,
+        x: i.transform[4],
+        y: i.transform[5],
+        h: Math.abs(i.height) || Math.abs(i.transform[3]) || 12,
+        font: i.fontName || ''
+      }));
+
+      // 按 y 从大到小（从上到下）排序
+      withY.sort((a, b) => b.y - a.y || a.x - b.x);
+
+      // 按 y 邻近聚合为行
+      const rows = [];
+      let cur = [];
+      let curY = null;
+      for (const w of withY) {
+        if (curY === null) { cur.push(w); curY = w.y; continue; }
+        const thresh = Math.max(2.5, w.h * 0.4);
+        if (Math.abs(w.y - curY) < thresh) cur.push(w);
+        else { if (cur.length) rows.push(cur); cur = [w]; curY = w.y; }
+      }
+      if (cur.length) rows.push(cur);
+
+      for (const row of rows) {
+        row.sort((a, b) => a.x - b.x);
+        const text = row.map(w => w.str).join('').replace(/\s+/g, ' ').trim();
+        if (!text) continue;
+
+        const xMin = Math.min(...row.map(w => w.x));
+        const yTop = Math.max(...row.map(w => w.y + w.h));
+        const yBottom = Math.min(...row.map(w => w.y));
+        const height = Math.max(...row.map(w => w.h));
+
+        allLines.push({
+          text, x: xMin, yTop, yBottom, height,
+          page: p, font: row[0].font
+        });
+      }
+    }
+  }
+
+  /* ---------------- 标题识别 ---------------- */
+  function normalizeHF(t) {
+    return t.replace(/\s+/g, '').replace(/\d+/g, 'N');
+  }
+
+  function matchNumbering(text) {
+    if (/^第[一二三四五六七八九十百千零\d]+[章篇部]/.test(text)) return { level: 1, type: '章/篇', bonus: 4 };
+    if (/^第[一二三四五六七八九十百千零\d]+节/.test(text)) return { level: 2, type: '节', bonus: 4 };
+    if (/^[一二三四五六七八九十百千]+[、.．]/.test(text)) return { level: 3, type: '中文序号', bonus: 3 };
+    if (/^[（(][一二三四五六七八九十\d]+[）)]/.test(text)) return { level: 4, type: '括号序号', bonus: 3 };
+    if (/^\d+[.．、]/.test(text)) return { level: 5, type: '数字序号', bonus: 2 };
+    return null;
+  }
+
+  function detectDiseaseTitles(lines, sensitivity, maxLevel) {
+    const cfg = {
+      strict: { minScore: 7, ratioStrong: 1.25, ratioWeak: 1.15 },
+      medium: { minScore: 5, ratioStrong: 1.20, ratioWeak: 1.08 },
+      loose:  { minScore: 3, ratioStrong: 1.15, ratioWeak: 1.02 }
+    }[sensitivity] || { minScore: 5, ratioStrong: 1.20, ratioWeak: 1.08 };
+
+    // 统计字号：用中位数偏大值作为正文基准
+    const heights = lines.map(l => l.height).filter(h => h > 3).sort((a, b) => a - b);
+    const medianH = heights.length ? heights[Math.floor(heights.length * 0.55)] : 12;
+
+    // 页眉页脚识别：出现在页面上下 6% 区域、重复出现的内容
+    const hfCounter = {};
+    const minRepeat = Math.max(3, Math.floor(pageCount * 0.2));
+    for (const line of lines) {
+      const ph = pageHeights[line.page];
+      if (!ph) continue;
+      const relY = line.yBottom / ph;
+      if (relY > 0.94 || relY < 0.06) {
+        const key = normalizeHF(line.text);
+        if (key.length >= 2) hfCounter[key] = (hfCounter[key] || 0) + 1;
+      }
+    }
+    const headerFooter = new Set();
+    for (const [k, v] of Object.entries(hfCounter)) if (v >= minRepeat) headerFooter.add(k);
+
+    const candidates = [];
+    for (const line of lines) {
+      const text = line.text.trim();
+      if (!text) continue;
+      if (headerFooter.has(normalizeHF(text))) continue;
+
+      const hRatio = line.height / medianH;
+      const len = text.length;
+      const num = matchNumbering(text);
+      const level = num ? num.level : 0;
+
+      // 层级过滤
+      if (num && level > maxLevel) continue;
+
+      let score = 0;
+      const reasons = [];
+
+      // 字号得分
+      if (hRatio >= cfg.ratioStrong) { score += 4; reasons.push('大字号'); }
+      else if (hRatio >= cfg.ratioWeak) { score += 2; reasons.push('字号偏大'); }
+      else if (hRatio < 0.88) score -= 2;
+
+      // 编号得分
+      if (num) {
+        score += num.bonus;
+        reasons.push(num.type);
+      }
+
+      // 长度
+      if (len < 2) score -= 6;
+      else if (len <= 22) score += 1;
+      else if (len > 40) score -= 3;
+
+      // 结尾标点（标题一般不以句读结尾）
+      if (/[。，；,;！？!?]$/.test(text)) score -= 3;
+
+      // 纯数字
+      if (/^\d+$/.test(text)) score -= 6;
+
+      // 纯英数
+      if (/^[a-zA-Z0-9\s.+\-]+$/.test(text)) score -= 2;
+
+      // 图表标题
+      if (/^(表|图|Fig|Table|Example)\s*\d/i.test(text)) score -= 5;
+
+      // 页码范围
+      if (/^\d+\s*[-–—]\s*\d+$/.test(text)) score -= 5;
+
+      // 内部标点过多
+      const punc = (text.match(/[，。；,;、]/g) || []).length;
+      if (punc >= 2) score -= 2;
+
+      // 明显是正文：结尾是“的”等虚词 + 长句
+      if (len > 25 && /[的地得]$/.test(text)) score -= 2;
+
+      if (score >= cfg.minScore) {
+        candidates.push({
+          id: 'c_' + line.page + '_' + Math.round(line.yTop) + '_' + candidates.length,
+          title: text,
+          page: line.page,
+          yTop: line.yTop,
+          yBottom: line.yBottom,
+          level: level || 0,
+          score: score,
+          reasons: reasons,
+          source: 'auto'
+        });
+      }
+    }
+
+    return { candidates, medianH, headerFooter };
+  }
+
+  /* ---------------- 执行识别 ---------------- */
+  async function runDetection() {
+    if (!pdfDoc) return;
+    busy(true, '正在提取文本层…');
+    try {
+      await extractAllLines();
+    } catch (e) {
+      console.error(e);
+      toast('文本提取失败：' + (e.message || e));
+      busy(false);
+      return;
+    }
+
+    if (allLines.length === 0) {
+      busy(false);
+      toast('未检测到文本层（可能是扫描版或图片 PDF）');
+      $('detectStatus').textContent = '⚠ 该 PDF 没有可提取的文字层';
+      $('autoEmpty').innerHTML = '该 PDF 是扫描版或图片型，无法自动识别疾病。<br>请使用“手动切割”功能。';
+      return;
+    }
+
+    busy(true, '正在识别疾病标题…');
+    try {
+      const sensitivity = $('autoSensitivity').value;
+      const maxLevel = parseInt($('autoMaxLevel').value, 10) || 4;
+      const { candidates } = detectDiseaseTitles(allLines, sensitivity, maxLevel);
+
+      // 按页码和 y 从上到下排序
+      candidates.sort((a, b) => a.page - b.page || b.yTop - a.yTop);
+
+      detected = candidates;
+      selectedDetected = new Set(candidates.map(c => c.id));
+
+      $('detectStatus').textContent = `共扫描 ${allLines.length} 行文本，识别出 ${candidates.length} 个候选`;
+      renderDetected();
+    } catch (e) {
+      console.error(e);
+      toast('识别失败：' + (e.message || e));
+    } finally {
+      busy(false);
+    }
+  }
+
+  /* ---------------- 渲染识别结果 ---------------- */
+  function renderLevelFilterBar() {
+    const bar = $('levelFilterBar');
+    bar.innerHTML = '';
+    const counts = { all: detected.length };
+    for (let l = 1; l <= 5; l++) counts[l] = detected.filter(d => d.level === l).length;
+
+    const make = (key, label, count) => {
+      const btn = document.createElement('button');
+      btn.textContent = `${label} (${count})`;
+      btn.dataset.level = String(key);
+      if (String(currentLevelFilter) === String(key)) btn.classList.add('active');
+      btn.addEventListener('click', () => {
+        currentLevelFilter = key;
+        renderDetected();
+      });
+      bar.appendChild(btn);
+    };
+    make('all', '全部', counts.all);
+    const levelNames = { 1: '第X章', 2: '第X节', 3: '一、', 4: '（一）', 5: '1.', 0: '其他' };
+    for (let l = 1; l <= 5; l++) {
+      if (counts[l] > 0) make(l, levelNames[l], counts[l]);
+    }
+    if (counts[0] > 0) make(0, '其他', counts[0]);
+  }
+
+  function renderDetected() {
+    renderLevelFilterBar();
+
+    const listEl = $('autoList');
+    listEl.innerHTML = '';
+
+    let items = detected;
+    if (currentLevelFilter !== 'all') {
+      items = detected.filter(d => d.level === Number(currentLevelFilter));
+    }
+
+    // 排序：按页码、y 从大到小
+    items = items.slice().sort((a, b) => a.page - b.page || b.yTop - a.yTop);
+
+    if (items.length === 0) {
+      $('autoEmpty').classList.remove('hidden');
+      listEl.classList.add('hidden');
+      $('autoCount').textContent = selectedDetected.size;
+      updateAutoPreview();
+      return;
+    }
+
+    $('autoEmpty').classList.add('hidden');
+    listEl.classList.remove('hidden');
+
+    for (const item of items) {
+      const row = document.createElement('div');
+      row.className = 'auto-item';
+
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = selectedDetected.has(item.id);
+      cb.addEventListener('change', () => {
+        if (cb.checked) selectedDetected.add(item.id);
+        else selectedDetected.delete(item.id);
+        $('autoCount').textContent = selectedDetected.size;
+        updateAutoPreview();
+      });
+
+      const pageTag = document.createElement('span');
+      pageTag.className = 'page-tag';
+      pageTag.textContent = 'p' + item.page;
+
+      const levelTag = document.createElement('span');
+      levelTag.className = 'level-tag level-' + item.level;
+      const levelNames = { 1: '章', 2: '节', 3: '一、', 4: '（一）', 5: '1.', 0: '—' };
+      levelTag.textContent = levelNames[item.level] || '—';
+
+      const titleInput = document.createElement('input');
+      titleInput.type = 'text';
+      titleInput.className = 'title-input';
+      titleInput.value = item.title;
+      titleInput.title = '点击可修改标题';
+      titleInput.addEventListener('input', () => { item.title = titleInput.value; });
+
+      const scoreTag = document.createElement('span');
+      scoreTag.className = 'score-tag';
+      scoreTag.textContent = item.source === 'manual' ? '手动' : ('评分 ' + item.score);
+      scoreTag.title = (item.reasons || []).join('、') || '手动添加';
+
+      const delBtn = document.createElement('button');
+      delBtn.className = 'del-btn';
+      delBtn.textContent = '×';
+      delBtn.title = '删除';
+      delBtn.addEventListener('click', () => {
+        detected = detected.filter(d => d.id !== item.id);
+        selectedDetected.delete(item.id);
+        renderDetected();
+      });
+
+      row.appendChild(cb);
+      row.appendChild(pageTag);
+      row.appendChild(levelTag);
+      row.appendChild(titleInput);
+      row.appendChild(scoreTag);
+      row.appendChild(delBtn);
+      listEl.appendChild(row);
+    }
+
+    $('autoCount').textContent = selectedDetected.size;
+    updateAutoPreview();
+  }
+
+  function updateAutoPreview() {
+    const n = selectedDetected.size;
+    if (n === 0) {
+      $('autoPreview').textContent = '请至少选择一个疾病';
+      $('btnAutoSplit').disabled = true;
+    } else {
+      $('autoPreview').textContent = `将生成 ${n} 个 PDF 文件`;
+      $('btnAutoSplit').disabled = false;
+    }
+  }
+
+  /* ---------------- 识别按钮 ---------------- */
+  $('btnAutoDetect').addEventListener('click', runDetection);
+  $('autoSensitivity').addEventListener('change', runDetection);
+  $('autoMaxLevel').addEventListener('change', runDetection);
+
+  // 全选/清空/反选
+  document.querySelectorAll('.quick button[data-auto-act]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const act = btn.dataset.autoAct;
+      if (act === 'all') detected.forEach(d => selectedDetected.add(d.id));
+      else if (act === 'none') selectedDetected.clear();
+      else if (act === 'invert') {
+        const newSet = new Set();
+        detected.forEach(d => { if (!selectedDetected.has(d.id)) newSet.add(d.id); });
+        selectedDetected = newSet;
+      }
+      renderDetected();
+    });
+  });
+
+  // 手动添加
+  $('btnAddManual').addEventListener('click', () => {
+    $('addPage').value = 1;
+    $('addPage').max = pageCount;
+    $('addTitle').value = '';
+    $('addModalMask').classList.add('on');
+  });
+  $('addCancel').addEventListener('click', () => $('addModalMask').classList.remove('on'));
+  $('addConfirm').addEventListener('click', () => {
+    const page = Math.max(1, Math.min(pageCount, parseInt($('addPage').value, 10) || 1));
+    const title = ($('addTitle').value || '').trim();
+    const level = parseInt($('addLevel').value, 10) || 0;
+    if (!title) { toast('请输入疾病名称'); return; }
+
+    // 在该页中找到最接近顶部的位置（默认 yTop 用 page 高度）
+    const ph = pageHeights[page] || 800;
+    const item = {
+      id: 'm_' + Date.now() + '_' + detected.length,
+      title,
+      page,
+      yTop: ph,      // 手动添加默认从页顶开始
+      yBottom: 0,
+      level,
+      score: 999,
+      reasons: ['手动'],
+      source: 'manual'
+    };
+    detected.push(item);
+    selectedDetected.add(item.id);
+    renderDetected();
+    $('addModalMask').classList.remove('on');
+    toast('已添加：' + title);
+  });
+
+  // 边距设置显隐
+  $('autoTitleTop').addEventListener('change', () => {
+    $('autoMarginField').classList.toggle('hidden', !$('autoTitleTop').checked);
+  });
+  $('autoMarginField').classList.toggle('hidden', !$('autoTitleTop').checked);
+
+  /* ---------------- 按识别结果拆分 ---------------- */
+  $('btnAutoSplit').addEventListener('click', async () => {
+    if (selectedDetected.size === 0) { toast('请至少选择一个疾病'); return; }
+
+    const items = detected
+      .filter(d => selectedDetected.has(d.id))
+      .sort((a, b) => a.page - b.page || b.yTop - a.yTop);
+
+    if (!items.length) { toast('没有可拆分的疾病'); return; }
+
+    const useZip = $('autoZip').checked;
+    const titleTop = $('autoTitleTop').checked;
+    const cropSame = $('autoCropSame').checked;
+    const topMargin = Math.max(0, Math.min(80, parseInt($('autoTopMargin').value, 10) || 10));
+
+    busy(true, `正在拆分（共 ${items.length} 个文件）…`);
+    try {
+      const src = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+      const files = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const d = items[i];
+        const next = items[i + 1];
+
+        const startPage = d.page;
+        const endPage = next ? next.page : pageCount;
+        if (startPage > endPage) continue;
+
+        const out = await PDFDocument.create();
+        const indices = [];
+        for (let p = startPage; p <= endPage; p++) indices.push(p - 1);
+        const copied = await out.copyPages(src, indices);
+
+        for (let k = 0; k < copied.length; k++) {
+          const page = copied[k];
+          const globalPage = indices[k] + 1;
+          const { width, height } = page.getSize();
+
+          let cropTop = height;
+          let cropBottom = 0;
+          let needCrop = false;
+
+          // 起始页：标题上方裁掉（让标题贴顶）
+          if (titleTop && globalPage === startPage) {
+            const desiredTop = Math.min(height, d.yTop + topMargin);
+            if (desiredTop < height - 2) {
+              cropTop = desiredTop;
+              needCrop = true;
+            }
+          }
+
+          // 结束页：底部裁掉（如果下一个疾病就在这一页）
+          if (cropSame && next && globalPage === endPage && next.page === endPage) {
+            const desiredBottom = Math.max(0, next.yTop + 2);
+            if (desiredBottom > 2 && desiredBottom < height - 5) {
+              cropBottom = desiredBottom;
+              needCrop = true;
+            }
+          }
+
+          if (needCrop) {
+            const h = cropTop - cropBottom;
+            if (h > 20) {
+              try {
+                page.setCropBox(0, cropBottom, width, h);
+                page.setMediaBox(0, cropBottom, width, h);
+              } catch (e) { /* 忽略 */ }
+            }
+          }
+          out.addPage(page);
+        }
+
+        const bytes = await out.save();
+        const fileName = sanitize(d.title) + '.pdf';
+        files.push({ name: fileName, bytes });
+      }
+
+      if (files.length === 0) { toast('没有生成任何文件'); return; }
+
+      if (files.length === 1) {
+        download(files[0].bytes, files[0].name);
+        toast('已生成 1 个文件');
+      } else if (useZip) {
+        const zip = new JSZip();
+        files.forEach(f => zip.file(f.name, f.bytes));
+        const blob = await zip.generateAsync({ type: 'blob' });
+        download(blob, `${sanitize(currentFileName.replace(/\.pdf$/i, ''))}_按疾病拆分_${files.length}份.zip`);
+        toast(`已打包 ${files.length} 个文件`);
+      } else {
+        for (const f of files) { download(f.bytes, f.name); await sleep(350); }
+        toast(`已下载 ${files.length} 个文件`);
+      }
+    } catch (e) {
+      console.error(e);
+      toast('拆分失败：' + (e.message || e));
+    } finally {
+      busy(false);
+    }
+  });
+
+  /* ---------------- 标签切换 ---------------- */
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const target = tab.dataset.tab;
+      $('paneAuto').classList.toggle('hidden', target !== 'auto');
+      $('paneManual').classList.toggle('hidden', target !== 'manual');
+      if (target === 'manual' && pdfDoc && !window._manualInited) {
+        initManualView();
+      }
+    });
+  });
+
+  /* ---------------- 手动切割（精简版） ---------------- */
+  let manualInited = false;
+  async function initManualView() {
+    if (manualInited) return;
+    manualInited = true;
+    window._manualInited = true;
+
+    const thumbsEl = $('thumbs');
+    thumbsEl.innerHTML = '';
+    const cards = [];
+    const frag = document.createDocumentFragment();
+    for (let i = 1; i <= pageCount; i++) {
+      const card = document.createElement('div');
+      card.className = 'thumb';
+      card.dataset.page = String(i);
+      card.innerHTML = `<canvas></canvas><span class="num">第 ${i} 页</span>`;
+      card.addEventListener('click', () => togglePage(i));
+      frag.appendChild(card);
+      cards.push(card);
+    }
+    thumbsEl.appendChild(frag);
+
+    let selected = new Set();
+    const selCountEl = $('selCount');
+    const rangeInput = $('rangeInput');
+
+    function togglePage(p) {
+      if (selected.has(p)) selected.delete(p); else selected.add(p);
+      updateUI();
+    }
+    function updateUI() {
+      cards.forEach((card, idx) => card.classList.toggle('selected', selected.has(idx + 1)));
+      selCountEl.textContent = String(selected.size);
+      rangeInput.value = compressRanges(selected);
+    }
+    function compressRanges(set) {
+      const arr = [...set].sort((a, b) => a - b);
+      const parts = []; let i = 0;
+      while (i < arr.length) {
+        let j = i;
+        while (j + 1 < arr.length && arr[j + 1] === arr[j] + 1) j++;
+        parts.push(i === j ? String(arr[i]) : arr[i] + '-' + arr[j]);
+        i = j + 1;
+      }
+      return parts.join(',');
+    }
+    document.querySelectorAll('.quick button[data-act]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const act = btn.dataset.act;
+        if (act === 'all') selected = new Set(allPages());
+        else if (act === 'none') selected = new Set();
+        else if (act === 'invert') selected = new Set(allPages().filter(p => !selected.has(p)));
+        else if (act === 'odd') selected = new Set(allPages().filter(p => p % 2 === 1));
+        else if (act === 'even') selected = new Set(allPages().filter(p => p % 2 === 0));
+        updateUI();
+      });
+    });
+    rangeInput.addEventListener('change', () => {
+      const s = rangeInput.value.trim();
+      if (!s) return;
+      const set = parseRanges(s, pageCount);
+      if (!set.size) { toast('范围格式无效'); return; }
+      selected = set;
+      cards.forEach((card, idx) => card.classList.toggle('selected', selected.has(idx + 1)));
+      selCountEl.textContent = String(selected.size);
+    });
+    function parseRanges(str, max) {
+      const out = new Set();
+      if (!str) return out;
+      str.split(/[,，;；\s]+/).forEach(part => {
+        if (!part) return;
+        const m = part.match(/^(\d+)\s*[-~—]\s*(\d+)$/);
+        if (m) {
+          let a = +m[1], b = +m[2]; if (a > b) [a, b] = [b, a];
+          for (let i = a; i <= b; i++) if (i >= 1 && i <= max) out.add(i);
+        } else if (/^\d+$/.test(part)) {
+          const n = +part; if (n >= 1 && n <= max) out.add(n);
+        }
+      });
+      return out;
+    }
+
+    async function renderThumb(i) {
+      const card = cards[i - 1];
+      const page = await pdfDoc.getPage(i);
+      const base = page.getViewport({ scale: 1 });
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const scale = (140 * dpr) / base.width;
+      const vp = page.getViewport({ scale });
+      const canvas = card.querySelector('canvas');
+      canvas.width = Math.round(vp.width);
+      canvas.height = Math.round(vp.height);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+    }
+    let nextP = 1;
+    const limit = Math.min(4, pageCount);
+    async function worker() {
+      while (true) {
+        const i = nextP++; if (i > pageCount) break;
+        try { await renderThumb(i); } catch (e) {}
+      }
+    }
+    Promise.all(Array.from({ length: limit }, worker));
+
+    async function buildPDF(set) {
+      const src = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+      const out = await PDFDocument.create();
+      const indices = [...set].sort((a, b) => a - b).map(p => p - 1);
+      const cp = await out.copyPages(src, indices);
+      cp.forEach(p => out.addPage(p));
+      return out.save();
+    }
+    function baseName() { return sanitize(currentFileName.replace(/\.pdf$/i, '')) || 'document'; }
+    function pagesLabel(set) {
+      const arr = [...set].sort((a, b) => a - b);
+      if (!arr.length) return 'empty';
+      if (arr.length === 1) return 'p' + arr[0];
+      const cont = arr.every((v, i) => i === 0 || v === arr[i - 1] + 1);
+      return cont ? `p${arr[0]}-${arr[arr.length - 1]}` : `p${arr[0]}_等${arr.length}页`;
+    }
+
+    async function doExtract(remove) {
+      let pages;
+      const s = rangeInput.value.trim();
+      if (s) pages = parseRanges(s, pageCount);
+      else pages = new Set(selected);
+      if (!pages.size) { toast('请先选择页面'); return; }
+
+      let finalPages;
+      if (remove) {
+        finalPages = new Set(allPages().filter(p => !pages.has(p)));
+        if (!finalPages.size) { toast('不能删除全部页面'); return; }
+      } else finalPages = pages;
+
+      busy(true, remove ? '正在删除…' : '正在提取…');
+      try {
+        const bytes = await buildPDF(finalPages);
+        download(bytes, `${baseName()}_${remove ? '删除后' : '提取'}_${pagesLabel(finalPages)}.pdf`);
+        toast('已生成：' + finalPages.size + ' 页');
+      } catch (e) { toast('失败：' + e.message); }
+      finally { busy(false); }
+    }
+
+    $('btnExtract').addEventListener('click', () => doExtract(false));
+    $('btnRemove').addEventListener('click', () => doExtract(true));
+
+    $('btnSplit').addEventListener('click', async () => {
+      const n = Math.max(1, parseInt($('splitN').value, 10) || 1);
+      const useZip = $('splitZip').checked;
+      const pages = allPages();
+      const chunks = [];
+      for (let i = 0; i < pages.length; i += n) chunks.push(pages.slice(i, i + n));
+
+      busy(true, `正在拆分（共 ${chunks.length} 个文件）…`);
+      try {
+        const src = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+        const files = [];
+        for (const chunk of chunks) {
+          const out = await PDFDocument.create();
+          const cp = await out.copyPages(src, chunk.map(p => p - 1));
+          cp.forEach(p => out.addPage(p));
+          const bytes = await out.save();
+          files.push({ name: `${baseName()}_${pagesLabel(new Set(chunk))}.pdf`, bytes });
+        }
+
+        if (files.length === 1) { download(files[0].bytes, files[0].name); }
+        else if (useZip) {
+          const zip = new JSZip();
+          files.forEach(f => zip.file(f.name, f.bytes));
+          const blob = await zip.generateAsync({ type: 'blob' });
+          download(blob, `${baseName()}_拆分_${files.length}份.zip`);
+        } else {
+          for (const f of files) { download(f.bytes, f.name); await sleep(350); }
+        }
+        toast('已完成');
+      } catch (e) { toast('失败：' + e.message); }
+      finally { busy(false); }
+    });
+
+    updateUI();
+  }
+
+})();
+</script>
+</body>
+</html>
