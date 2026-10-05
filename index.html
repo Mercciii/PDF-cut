@@ -844,7 +844,11 @@
   refreshExtraWordsCache();
 
   function diseaseScore(text, extraWords) {
-    const t = String(text || '').replace(/[\s　]+/g, '');
+    let t = String(text || '').replace(/[\s　]+/g, '');
+    // 1. 去掉英文括号及内部内容（如 (hernia of linea alba)）
+    t = t.replace(/[（(][a-zA-Z\s.]+[）)]/g, '');
+    // 2. 去掉末尾的标点符号和括号
+    t = t.replace(/[。，；,;！？!?）)]$/, '');
     if (!t) return { score: -10, why: [], isDisease: false };
 
     if (extraWords.length) {
