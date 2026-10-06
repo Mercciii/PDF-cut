@@ -1,4 +1,4 @@
-const CACHE = 'pdf-splitter-v1';
+const CACHE = 'pdf-splitter-v2';
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./index.html'])));
 });
