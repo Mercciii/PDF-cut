@@ -1200,7 +1200,7 @@ window.__initApp = function () {
 
     let t = raw.replace(/[（(][a-zA-Z\s.]+[）)]/g, '');
 
-    const cutMatch = t.match(/^(.{2,40}?)(?=[。，；,;！？!?是]|$)/);
+    const cutMatch = t.match(/^(.{2,40}?)(?=[。，；,;！？!?是\s ]|$)/);
     if (cutMatch) t = cutMatch[1];
 
     t = t.replace(/^[\s。，；,;！？!?）)]+/, '')
