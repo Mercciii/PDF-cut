@@ -413,7 +413,19 @@
   const $ = (id) => document.getElementById(id);
   const dropZone = $('dropZone'), fileInput = $('fileInput'), workspace = $('workspace');
   const overlay = $('overlay'), overlayText = $('overlayText'), toastEl = $('toast');
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
 
+// 点击区域触发文件选择
+dropZone.addEventListener('click', () => {
+    fileInput.click();
+});
+
+// 文件选择后处理
+fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) { /* 处理选中的 PDF 文件 */ }
+});
   /* ---------------- 全局状态 ---------------- */
   let pdfBytes = null;
   let pdfDoc = null;
