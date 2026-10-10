@@ -96,6 +96,7 @@
   .auto-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;font-size:13px;transition:.1s}
   .auto-item:hover{background:#eef2ff}
   .auto-item input[type=checkbox]{accent-color:var(--primary);flex-shrink:0;width:16px;height:16px}
+  .page-tag{background:#e0e7ff;color:#4338ca;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;flex-shrink:0;min-width:36px;text-align:center}
   .auto-item .page-tag{background:#e0e7ff;color:#4338ca;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;flex-shrink:0;min-width:36px;text-align:center}
   .auto-item .level-tag{border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;flex-shrink:0;white-space:nowrap}
   .level-1{background:#fee2e2;color:#991b1b}
@@ -148,11 +149,41 @@
   .modal .actions .ok{background:var(--primary);color:#fff}
 
   .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;max-height:62vh;overflow:auto}
-  .thumb{border:2px solid var(--line);border-radius:8px;padding:4px;cursor:pointer;background:#fff;text-align:center;transition:.15s}
+  .thumb{position:relative;border:2px solid var(--line);border-radius:8px;padding:4px;cursor:pointer;background:#fff;text-align:center;transition:.15s}
   .thumb:hover{border-color:var(--primary)}
   .thumb.selected{border-color:var(--primary);background:#eef2ff}
   .thumb canvas{width:100%;display:block;border-radius:4px}
   .thumb .num{font-size:11px;color:var(--muted);display:block;margin-top:3px}
+  .thumb .cut-btn{position:absolute;right:5px;top:5px;width:24px;height:24px;border-radius:7px;
+    border:1px solid var(--line);background:rgba(255,255,255,.94);color:var(--muted);
+    font-size:12px;line-height:1;cursor:pointer;padding:0;display:none;
+    align-items:center;justify-content:center;transition:.15s}
+  .thumb:hover .cut-btn{display:flex}
+  .thumb .cut-btn:hover{border-color:var(--ai);color:var(--ai);background:#f5f3ff}
+  .thumb .cut-badge{position:absolute;left:5px;top:5px;background:var(--ai);color:#fff;
+    font-size:10px;font-weight:700;border-radius:6px;padding:2px 5px;line-height:1.3}
+
+  /* 页内切割面板 */
+  .cut-list{display:flex;flex-direction:column;gap:6px;max-height:260px;overflow:auto}
+  .cut-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border:1px solid var(--line);
+    border-radius:8px;font-size:13px;background:#fafafa}
+  .cut-item .del-btn{border:none;background:transparent;color:var(--muted);cursor:pointer;
+    font-size:15px;padding:2px 6px;border-radius:4px;font-family:inherit}
+  .cut-item .del-btn:hover{background:#fee2e2;color:var(--danger)}
+
+  /* 页内切割弹窗 */
+  .page-cut-modal{width:min(760px,94vw);max-height:92vh;display:flex;flex-direction:column}
+  .pc-toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .pc-stage{flex:1;min-height:180px;overflow:auto;background:#f3f4f6;border:1px solid var(--line);
+    border-radius:10px;padding:10px;display:flex;justify-content:center;align-items:flex-start}
+  .pc-wrap{position:relative;display:inline-block;line-height:0}
+  .pc-wrap canvas{display:block;border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,.14);background:#fff}
+  .pc-lines{position:absolute;inset:0;cursor:crosshair;touch-action:none}
+  .pc-line{position:absolute;left:-6px;right:-6px;height:0;border-top:2px dashed var(--ai);
+    cursor:ns-resize;touch-action:none}
+  .pc-line::before{content:'';position:absolute;left:0;right:0;top:-8px;height:18px}
+  .pc-line .pc-line-tag{position:absolute;left:0;top:-9px;background:var(--ai);color:#fff;
+    font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;line-height:1.3}
 </style>
 </head>
 <body>
@@ -326,6 +357,9 @@
           </div>
           <div id="status" class="status"></div>
           <div id="thumbs" class="thumbs"></div>
+          <p class="hint" style="margin-top:10px">
+            提示：把鼠标移到缩略图上，点右上角 <strong>✂</strong> 按钮，即可对这一页做「页内切割」。
+          </p>
         </div>
         <aside class="panel">
           <div class="field">
@@ -344,6 +378,21 @@
           <label class="check"><input type="checkbox" id="splitZip" checked> 打包为 ZIP 下载</label>
           <button id="btnSplit" class="btn primary">开始拆分</button>
         </aside>
+      </div>
+
+      <!-- 页内切割汇总面板 -->
+      <div class="panel" id="pageCutPanel" style="margin-top:14px">
+        <div class="panel-head">
+          <h2>✂️ 页内切割 <span id="cutSegCount" class="badge ai">0</span></h2>
+          <div class="quick">
+            <button id="btnCutClearAll">清空全部</button>
+            <button id="btnCutExport">导出切割片段</button>
+          </div>
+        </div>
+        <div id="cutEmpty" class="muted" style="padding:8px 2px">
+          还没有页内切割配置。在左侧缩略图右上角点 ✂ 打开某一页进行切割。
+        </div>
+        <div id="cutList" class="cut-list hidden"></div>
       </div>
     </div>
   </section>
@@ -373,6 +422,33 @@
     <div class="actions">
       <button class="cancel" id="addCancel">取消</button>
       <button class="ok" id="addConfirm">添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 页内切割弹窗 -->
+<div id="pageCutMask" class="modal-mask">
+  <div class="modal page-cut-modal">
+    <h3 id="pcTitle">第 1 页 · 页内切割</h3>
+    <p class="hint" style="margin:0 0 10px">
+      在预览图上<strong>点击</strong>可添加横向切割线；<strong>按住拖动</strong>调整位置；<strong>双击线条</strong>删除。
+    </p>
+    <div class="pc-toolbar">
+      <button class="btn ghost" type="button" data-pc-split="2">二等分</button>
+      <button class="btn ghost" type="button" data-pc-split="3">三等分</button>
+      <button class="btn ghost" type="button" data-pc-split="4">四等分</button>
+      <button class="btn ghost" type="button" id="pcClear">清除切割线</button>
+      <span class="muted" id="pcInfo" style="margin-left:auto">当前 1 段</span>
+    </div>
+    <div class="pc-stage" id="pcStage">
+      <div class="pc-wrap" id="pcWrap">
+        <canvas id="pcCanvas"></canvas>
+        <div class="pc-lines" id="pcLines"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="cancel" type="button" id="pcCancel">取消</button>
+      <button class="ok" type="button" id="pcSave">保存切割</button>
     </div>
   </div>
 </div>
@@ -429,6 +505,9 @@
   let detecting = false;          // 防止识别重入
   let extraWordsCache = [];        // 缓存补充关键词解析结果
 
+  let manualInited = false;        // 手动面板是否已初始化
+  let pageCuts = new Map();        // 页内切割配置： pageNum -> [比例,...]
+
   /* ============================================================
    * 通用工具
    * ============================================================ */
@@ -476,6 +555,7 @@
     return s || String(name || '').trim();
   }
   function allPages() { return Array.from({ length: pageCount }, (_, i) => i + 1); }
+  function baseName() { return sanitize(currentFileName.replace(/\.pdf$/i, '')) || 'document'; }
   function download(data, filename) {
     const blob = data instanceof Blob ? data : new Blob([data], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
@@ -583,6 +663,16 @@
     aiCache = { key: null, items: [] };
     detecting = false;
     extraWordsCache = [];
+
+    // 手动切割状态复位
+    manualInited = false;
+    pageCuts.clear();
+    $('thumbs').innerHTML = '';
+    $('cutList').innerHTML = '';
+    $('cutList').classList.add('hidden');
+    $('cutEmpty').classList.remove('hidden');
+    $('cutSegCount').textContent = '0';
+
     workspace.classList.add('hidden');
     dropZone.classList.remove('hidden');
     $('autoList').innerHTML = '';
@@ -1634,7 +1724,6 @@
   /* ============================================================
    * 手动切割
    * ============================================================ */
-  let manualInited = false;
   async function initManualView() {
     if (manualInited) return;
     manualInited = true;
@@ -1648,8 +1737,13 @@
       const card = document.createElement('div');
       card.className = 'thumb';
       card.dataset.page = String(i);
-      card.innerHTML = `<canvas></canvas><span class="num">第 ${i} 页</span>`;
+      card.innerHTML = `<canvas></canvas><span class="num">第 ${i} 页</span>
+        <button class="cut-btn" type="button" title="页内切割">✂</button>`;
       card.addEventListener('click', () => togglePage(i));
+      card.querySelector('.cut-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openPageCut(i);
+      });
       frag.appendChild(card);
       cards.push(card);
     }
@@ -1681,7 +1775,7 @@
     }
 
     document.querySelectorAll('.quick button[data-act]').forEach(btn => {
-      btn.addEventListener('click', () => {
+      btn.onclick = () => {
         const act = btn.dataset.act;
         if (act === 'all') selected = new Set(allPages());
         else if (act === 'none') selected = new Set();
@@ -1689,10 +1783,10 @@
         else if (act === 'odd') selected = new Set(allPages().filter(p => p % 2 === 1));
         else if (act === 'even') selected = new Set(allPages().filter(p => p % 2 === 0));
         updateUI();
-      });
+      };
     });
 
-    rangeInput.addEventListener('change', () => {
+    rangeInput.onchange = () => {
       const s = rangeInput.value.trim();
       if (!s) return;
       const set = parseRanges(s, pageCount);
@@ -1700,7 +1794,7 @@
       selected = set;
       cards.forEach((card, idx) => card.classList.toggle('selected', selected.has(idx + 1)));
       selCountEl.textContent = String(selected.size);
-    });
+    };
 
     function parseRanges(str, max) {
       const out = new Set();
@@ -1752,7 +1846,6 @@
       cp.forEach(p => out.addPage(p));
       return out.save();
     }
-    function baseName() { return sanitize(currentFileName.replace(/\.pdf$/i, '')) || 'document'; }
     function pagesLabel(set) {
       const arr = [...set].sort((a, b) => a - b);
       if (!arr.length) return 'empty';
@@ -1783,10 +1876,10 @@
       finally { busy(false); }
     }
 
-    $('btnExtract').addEventListener('click', () => doExtract(false));
-    $('btnRemove').addEventListener('click', () => doExtract(true));
+    $('btnExtract').onclick = () => doExtract(false);
+    $('btnRemove').onclick = () => doExtract(true);
 
-    $('btnSplit').addEventListener('click', async () => {
+    $('btnSplit').onclick = async () => {
       const n = Math.max(1, parseInt($('splitN').value, 10) || 1);
       const useZip = $('splitZip').checked;
       const pages = allPages();
@@ -1816,7 +1909,295 @@
         toast('已完成');
       } catch (e) { toast('失败：' + e.message); }
       finally { busy(false); }
+    };
+
+    /* ==========================================================
+     *  页内切割
+     * ========================================================== */
+    const pcMask   = $('pageCutMask');
+    const pcCanvas = $('pcCanvas');
+    const pcLines  = $('pcLines');
+    const pcStage  = $('pcStage');
+
+    let cutPageNum = 1;
+    let cuts = [];          // 当前编辑的切割线比例（0~1，从页面顶部算）
+    let dragIdx = -1, dragStartY = 0, dragMoved = false;
+
+    // 显示比例 → PDF 坐标系 y（自页面底部算起）
+    function ratioToPdfY(p, angle, H) {
+      const a = ((angle % 360) + 360) % 360;
+      if (a === 180) return H * p;
+      return H * (1 - p);
+    }
+
+    function ratioFromEvent(e) {
+      const r = pcLines.getBoundingClientRect();
+      if (!r.height) return 0.5;
+      return (e.clientY - r.top) / r.height;
+    }
+
+    function renderLines() {
+      pcLines.innerHTML = '';
+      const sorted = cuts.slice().sort((a, b) => a - b);
+      sorted.forEach((p, i) => {
+        const el = document.createElement('div');
+        el.className = 'pc-line';
+        el.dataset.i = String(cuts.indexOf(p));
+        el.style.top = (p * 100) + '%';
+        el.innerHTML = `<span class="pc-line-tag">${i + 1}</span>`;
+        pcLines.appendChild(el);
+      });
+      updateCutInfo();
+    }
+
+    function updateCutInfo() {
+      $('pcInfo').textContent = `当前 ${cuts.length + 1} 段`;
+    }
+
+    async function openPageCut(pn) {
+      cutPageNum = pn;
+      cuts = (pageCuts.get(pn) || []).slice().sort((a, b) => a - b);
+      $('pcTitle').textContent = `第 ${pn} 页 · 页内切割`;
+      pcMask.classList.add('on');
+      renderLines();
+
+      pcCanvas.width = 0; pcCanvas.height = 0;
+      pcCanvas.style.width = '0px'; pcCanvas.style.height = '0px';
+
+      try {
+        const page = await pdfDoc.getPage(pn);
+        const rot = ((page.rotate % 360) + 360) % 360;
+        if (rot === 90 || rot === 270) toast('该页包含旋转，切割结果可能不准确', 3600);
+
+        const base = page.getViewport({ scale: 1 });
+        const availW = Math.max(200, pcStage.clientWidth - 26);
+        const maxH = Math.max(240, window.innerHeight * 0.56);
+        const s = Math.min(availW / base.width, maxH / base.height);
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        const vp = page.getViewport({ scale: s * dpr });
+
+        pcCanvas.width = Math.round(vp.width);
+        pcCanvas.height = Math.round(vp.height);
+        pcCanvas.style.width = Math.round(base.width * s) + 'px';
+        pcCanvas.style.height = Math.round(base.height * s) + 'px';
+
+        const ctx = pcCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, pcCanvas.width, pcCanvas.height);
+        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      } catch (e) {
+        console.error(e);
+        toast('预览渲染失败：' + (e.message || e));
+      }
+    }
+
+    function onDragMove(e) {
+      if (dragIdx < 0) return;
+      if (!dragMoved && Math.abs(e.clientY - dragStartY) < 3) return;
+      dragMoved = true;
+      if (e.cancelable) e.preventDefault();
+      const p = Math.max(0.01, Math.min(0.99, ratioFromEvent(e)));
+      cuts[dragIdx] = p;
+      const el = pcLines.querySelector('.pc-line[data-i="' + dragIdx + '"]');
+      if (el) el.style.top = (p * 100) + '%';
+    }
+    function onDragUp() {
+      window.removeEventListener('pointermove', onDragMove);
+      window.removeEventListener('pointerup', onDragUp);
+      if (dragIdx >= 0 && dragMoved) {
+        cuts.sort((a, b) => a - b);
+        renderLines();
+      }
+      dragIdx = -1;
+      dragMoved = false;
+    }
+
+    pcLines.addEventListener('pointerdown', (e) => {
+      if (!pcCanvas.width) return;
+      const lineEl = e.target.closest ? e.target.closest('.pc-line') : null;
+      if (lineEl) {
+        dragIdx = Number(lineEl.dataset.i);
+      } else {
+        const p = ratioFromEvent(e);
+        if (p <= 0.005 || p >= 0.995) return;
+        cuts.push(p);
+        cuts.sort((a, b) => a - b);
+        renderLines();
+        dragIdx = cuts.indexOf(p);
+      }
+      dragMoved = false;
+      dragStartY = e.clientY;
+      window.addEventListener('pointermove', onDragMove);
+      window.addEventListener('pointerup', onDragUp);
     });
+
+    pcLines.addEventListener('dblclick', (e) => {
+      const lineEl = e.target.closest ? e.target.closest('.pc-line') : null;
+      if (!lineEl) return;
+      e.preventDefault();
+      const i = Number(lineEl.dataset.i);
+      if (i >= 0 && i < cuts.length) {
+        cuts.splice(i, 1);
+        renderLines();
+      }
+    });
+
+    document.querySelectorAll('[data-pc-split]').forEach(btn => {
+      btn.onclick = () => {
+        const n = parseInt(btn.dataset.pcSplit, 10);
+        if (!n || n < 2) return;
+        cuts = [];
+        for (let i = 1; i < n; i++) cuts.push(i / n);
+        renderLines();
+      };
+    });
+    $('pcClear').onclick = () => { cuts = []; renderLines(); };
+
+    $('pcCancel').onclick = () => pcMask.classList.remove('on');
+    pcMask.addEventListener('click', (e) => { if (e.target === pcMask) pcMask.classList.remove('on'); });
+
+    $('pcSave').onclick = () => {
+      const c = cuts.slice().sort((a, b) => a - b)
+        .filter(p => p > 0.01 && p < 0.99);
+      if (c.length === 0) pageCuts.delete(cutPageNum);
+      else pageCuts.set(cutPageNum, c);
+      updateCutBadges();
+      renderCutList();
+      pcMask.classList.remove('on');
+      toast(c.length
+        ? `第 ${cutPageNum} 页已设为 ${c.length + 1} 段`
+        : `已清除第 ${cutPageNum} 页的切割`);
+    };
+
+    function updateCutBadges() {
+      thumbsEl.querySelectorAll('.thumb').forEach(card => {
+        const pn = Number(card.dataset.page);
+        const c = pageCuts.get(pn);
+        let badge = card.querySelector('.cut-badge');
+        if (c && c.length) {
+          if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'cut-badge';
+            card.appendChild(badge);
+          }
+          badge.textContent = (c.length + 1) + '段';
+        } else if (badge) {
+          badge.remove();
+        }
+      });
+    }
+
+    function renderCutList() {
+      const listEl = $('cutList');
+      const emptyEl = $('cutEmpty');
+      const pages = [...pageCuts.keys()].sort((a, b) => a - b);
+
+      let total = 0;
+      pages.forEach(p => { total += pageCuts.get(p).length + 1; });
+      $('cutSegCount').textContent = String(total);
+
+      listEl.innerHTML = '';
+      if (!pages.length) {
+        emptyEl.classList.remove('hidden');
+        listEl.classList.add('hidden');
+        return;
+      }
+      emptyEl.classList.add('hidden');
+      listEl.classList.remove('hidden');
+
+      for (const pn of pages) {
+        const c = pageCuts.get(pn);
+        const row = document.createElement('div');
+        row.className = 'cut-item';
+        row.innerHTML = `
+          <span class="page-tag">p${pn}</span>
+          <span class="muted" style="flex-shrink:0">${c.length + 1} 段</span>
+          <span class="muted" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+            title="${c.map(p => Math.round(p * 100) + '%').join(' / ')}">
+            ${c.map(p => Math.round(p * 100) + '%').join(' / ')}
+          </span>
+          <button class="btn ghost" type="button" data-edit="${pn}">编辑</button>
+          <button class="del-btn" type="button" data-del="${pn}" title="删除">×</button>
+        `;
+        listEl.appendChild(row);
+      }
+    }
+
+    $('cutList').onclick = (e) => {
+      const t = e.target;
+      if (t.dataset && t.dataset.edit) {
+        openPageCut(Number(t.dataset.edit));
+      } else if (t.dataset && t.dataset.del) {
+        const pn = Number(t.dataset.del);
+        pageCuts.delete(pn);
+        updateCutBadges();
+        renderCutList();
+        toast('已移除第 ' + pn + ' 页的切割配置');
+      }
+    };
+
+    $('btnCutClearAll').onclick = () => {
+      if (!pageCuts.size) { toast('没有可清空的切割配置'); return; }
+      pageCuts.clear();
+      updateCutBadges();
+      renderCutList();
+      toast('已清空全部页内切割');
+    };
+
+    $('btnCutExport').onclick = async () => {
+      if (!pageCuts.size) { toast('还没有配置页内切割'); return; }
+
+      busy(true, '正在导出切割片段…');
+      try {
+        const src = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+        const files = [];
+        const pages = [...pageCuts.keys()].sort((a, b) => a - b);
+
+        for (const pn of pages) {
+          if (pn < 1 || pn > src.getPageCount()) continue;
+          const srcPage = src.getPage(pn - 1);
+          const { width, height } = srcPage.getSize();
+          const angle = ((srcPage.getRotation().angle % 360) + 360) % 360;
+
+          const boundaries = [0, ...pageCuts.get(pn), 1];
+
+          for (let i = 0; i < boundaries.length - 1; i++) {
+            const yA = ratioToPdfY(boundaries[i], angle, height);
+            const yB = ratioToPdfY(boundaries[i + 1], angle, height);
+            const y0 = Math.min(yA, yB);
+            const h  = Math.abs(yB - yA);
+            if (h < 4) continue;
+
+            const out = await PDFDocument.create();
+            const [copied] = await out.copyPages(src, [pn - 1]);
+            try {
+              copied.setCropBox(0, y0, width, h);
+              copied.setMediaBox(0, y0, width, h);
+            } catch (err) {}
+            out.addPage(copied);
+            const bytes = await out.save();
+            files.push({ name: `${baseName()}_p${pn}_${i + 1}.pdf`, bytes });
+          }
+        }
+
+        if (!files.length) { toast('没有生成任何片段'); return; }
+
+        const zip = new JSZip();
+        files.forEach(f => zip.file(f.name, f.bytes));
+        const blob = await zip.generateAsync({ type: 'blob' });
+        download(blob, `${baseName()}_页内切割_${files.length}份.zip`);
+        toast(`已导出 ${files.length} 个片段`);
+      } catch (e) {
+        console.error(e);
+        toast('导出失败：' + (e.message || e));
+      } finally {
+        busy(false);
+      }
+    };
+
+    // 初始渲染已有的切割标记
+    updateCutBadges();
+    renderCutList();
 
     updateUI();
   }
