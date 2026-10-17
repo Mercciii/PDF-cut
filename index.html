@@ -569,6 +569,23 @@
   const { PDFDocument } = PDFLib;
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const PDFJS_ASSET_BASES = [
+    'https://fastly.jsdelivr.net/npm/pdfjs-dist@3.11.174/',
+    'https://registry.npmmirror.com/pdfjs-dist/3.11.174/files/',
+    'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/'
+  ];
+  let pdfjsAssetBase = null;
+  async function resolvePdfjsAssetBase() {
+    if (pdfjsAssetBase) return pdfjsAssetBase;
+    for (const base of PDFJS_ASSET_BASES) {
+      try {
+        const r = await fetch(base + 'cmaps/UniGB-UCS2-H.bcmap');
+        if (r.ok) { pdfjsAssetBase = base; return base; }
+      } catch (e) {}
+    }
+    pdfjsAssetBase = PDFJS_ASSET_BASES[0];
+    return pdfjsAssetBase;
+  }
 
   /* ============================================================
    * 性能调优参数（集中管理，便于调整）
@@ -869,7 +886,13 @@
     try {
       const buf = await file.arrayBuffer();
       pdfBytes = buf;
-      pdfDoc = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+      const assetBase = await resolvePdfjsAssetBase();
+      pdfDoc = await pdfjsLib.getDocument({
+        data: buf.slice(0),
+        cMapUrl: assetBase + 'cmaps/',
+        cMapPacked: true,
+        standardFontDataUrl: assetBase + 'standard_fonts/'
+      }).promise;
       pageCount = pdfDoc.numPages;
       currentFileName = file.name;
 
