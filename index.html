@@ -97,7 +97,6 @@
   .auto-item:hover{background:#eef2ff}
   .auto-item input[type=checkbox]{accent-color:var(--primary);flex-shrink:0;width:16px;height:16px}
   .page-tag{background:#e0e7ff;color:#4338ca;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;flex-shrink:0;min-width:36px;text-align:center}
-  .auto-item .page-tag{background:#e0e7ff;color:#4338ca;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;flex-shrink:0;min-width:36px;text-align:center}
   .auto-item .level-tag{border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;flex-shrink:0;white-space:nowrap}
   .level-1{background:#fee2e2;color:#991b1b}
   .level-2{background:#fed7aa;color:#9a3412}
@@ -184,20 +183,57 @@
   .pc-line::before{content:'';position:absolute;left:0;right:0;top:-8px;height:18px}
   .pc-line .pc-line-tag{position:absolute;left:0;top:-9px;background:var(--ai);color:#fff;
     font-size:10px;font-weight:700;border-radius:4px;padding:1px 5px;line-height:1.3}
+
+  /* 触屏设备始终显示页内切割按钮 */
+  @media (hover: none) {
+    .thumb .cut-btn{display:flex}
+  }
+
+  .edit-btn{border:none;background:transparent;color:var(--muted);cursor:pointer;
+    font-size:13px;padding:2px 6px;border-radius:4px;font-family:inherit}
+  .edit-btn:hover{background:#e0e7ff;color:var(--primary)}
+
+  .outline-tag{background:#cffafe;color:#155e75;border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;flex-shrink:0;white-space:nowrap}
+  .toc-tag{background:#fef9c3;color:#854d0e;border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;flex-shrink:0;white-space:nowrap}
+  .import-tag{background:#f1f5f9;color:#475569;border-radius:4px;padding:2px 5px;font-size:10px;font-weight:600;flex-shrink:0;white-space:nowrap}
+
+  /* 覆盖层取消按钮 */
+  #btnCancel{margin-top:16px;border:1px solid var(--line);background:#fff;color:var(--text);
+    border-radius:8px;padding:7px 24px;font-size:13px;font-family:inherit;cursor:pointer;transition:.15s}
+  #btnCancel:hover{border-color:var(--danger);color:var(--danger)}
+
+  /* 拆分预览弹窗 */
+  .preview-modal{width:min(880px,94vw);display:flex;flex-direction:column;max-height:92vh}
+  .preview-body{display:grid;grid-template-columns:280px 1fr;gap:12px;flex:1;min-height:0}
+  @media(max-width:720px){.preview-body{grid-template-columns:1fr}.preview-stage{display:none}}
+  .preview-list{overflow:auto;border:1px solid var(--line);border-radius:10px;background:#fafafa;min-height:160px;max-height:60vh}
+  .pv-item{display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid #f1f3f7}
+  .pv-item:last-child{border-bottom:none}
+  .pv-item:hover{background:#eef2ff}
+  .pv-item.active{background:#e0e7ff}
+  .pv-item .pv-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+  .pv-item .pv-pages{color:var(--muted);flex-shrink:0}
+  .preview-stage{overflow:auto;background:#f3f4f6;border:1px solid var(--line);border-radius:10px;
+    padding:10px;min-height:160px;max-height:60vh;text-align:center}
+  .pv-wrap{position:relative;display:inline-block;line-height:0}
+  .pv-wrap canvas{display:block;border-radius:4px;box-shadow:0 2px 12px rgba(0,0,0,.14);background:#fff}
+  .pv-dark{position:absolute;left:0;right:0;background:rgba(15,23,42,.5);pointer-events:none}
+  .pv-cap{font-size:12px;color:var(--muted);margin-top:8px;text-align:center;line-height:1.5}
 </style>
 </head>
 <body>
 <div class="container">
   <header>
     <h1>📚 PDF 智能切割 · 自动识别疾病</h1>
-    <p class="sub">本地启发式识别 + AI 联网分析双引擎。生成文件只以疾病名命名，重名自动加序号。全程本地处理，文件不上传。</p>
+    <p class="sub">本地启发式 · 书签 · 目录页 · OCR · AI 联网多引擎识别。生成文件只以疾病名命名，重名自动加序号。全程本地处理，文件不上传。</p>
   </header>
 
   <section id="dropZone" class="dropzone">
     <input type="file" id="fileInput" accept="application/pdf,.pdf" hidden>
+    <input type="file" id="importInput" accept=".json,application/json" hidden>
     <div class="dz-icon">📄</div>
     <p><strong>点击选择</strong> 或拖拽 PDF 文件到这里</p>
-    <p class="hint" style="margin-top:8px">建议使用文字版（非扫描版）人卫教材 PDF</p>
+    <p class="hint" style="margin-top:8px">支持文字版与扫描版（OCR）人卫教材 PDF</p>
   </section>
 
   <section id="workspace" class="workspace hidden">
@@ -225,6 +261,9 @@
               <button data-auto-act="none">清空</button>
               <button data-auto-act="invert">反选</button>
               <button id="btnAddManual">+ 手动添加</button>
+              <button id="btnExportJSON" title="导出识别结果为 JSON">导出JSON</button>
+              <button id="btnExportCSV" title="导出识别结果为 CSV">导出CSV</button>
+              <button id="btnImportJSON" title="从 JSON 导入识别结果">导入</button>
             </div>
           </div>
           <div id="autoHint" class="muted" style="margin-bottom:10px;font-size:12px"></div>
@@ -272,6 +311,36 @@
             </div>
           </div>
 
+          <label class="check" style="margin-bottom:10px">
+            <input type="checkbox" id="useOutline" checked>
+            <span>🔖 解析 PDF 书签
+              <span class="desc">读取书签/大纲中的条目作为识别结果，通常最准确</span>
+            </span>
+          </label>
+
+          <label class="check" style="margin-bottom:10px">
+            <input type="checkbox" id="useTOC" checked>
+            <span>📑 解析目录页
+              <span class="desc">识别“目录”里的疾病条目并自动校准页码偏移</span>
+            </span>
+          </label>
+
+          <label class="check" style="margin-bottom:10px">
+            <input type="checkbox" id="useOCR">
+            <span>🔍 无文字层时自动 OCR
+              <span class="desc">扫描版自动用 Tesseract 识别，较慢，首次需联网下载语言包</span>
+            </span>
+          </label>
+
+          <div class="field hidden" id="ocrLangField" style="margin-top:-4px">
+            <label for="ocrLang">OCR 识别语言</label>
+            <select id="ocrLang">
+              <option value="chi_sim+eng" selected>中文简体 + 英文（推荐）</option>
+              <option value="chi_sim">中文简体</option>
+              <option value="eng">English</option>
+            </select>
+          </div>
+
           <div class="divider" style="margin:12px 0"></div>
 
           <div class="field">
@@ -305,6 +374,7 @@
           </div>
 
           <button id="btnAutoDetect" class="btn primary">🔍 开始识别</button>
+          <button id="btnOCRNow" class="btn ghost" style="width:100%;margin-top:9px">📷 对扫描版执行 OCR</button>
           <p class="hint" id="detectStatus" style="margin-top:8px"></p>
 
           <div class="divider"></div>
@@ -419,6 +489,10 @@
         <option value="0">其他</option>
       </select>
     </div>
+    <div class="field">
+      <label>结束页码（可选）</label>
+      <input type="number" id="addEndPage" min="1" placeholder="留空 = 到下一疾病所在页前">
+    </div>
     <div class="actions">
       <button class="cancel" id="addCancel">取消</button>
       <button class="ok" id="addConfirm">添加</button>
@@ -453,11 +527,34 @@
   </div>
 </div>
 
+<!-- 拆分预览弹窗 -->
+<div id="previewMask" class="modal-mask">
+  <div class="modal preview-modal">
+    <h3>拆分预览 <span class="muted" id="previewSummary"></span></h3>
+    <div class="preview-body">
+      <div class="preview-list" id="previewList"></div>
+      <div class="preview-stage" id="previewStage">
+        <div class="pv-wrap" id="pvWrap">
+          <canvas id="previewCanvas"></canvas>
+          <div class="pv-dark" id="pvDarkTop"></div>
+          <div class="pv-dark" id="pvDarkBottom"></div>
+        </div>
+        <div class="pv-cap" id="previewCap"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="cancel" type="button" id="previewCancelBtn">取消</button>
+      <button class="ok" type="button" id="previewConfirmBtn">开始生成</button>
+    </div>
+  </div>
+</div>
+
 <div id="overlay">
   <div>
     <div class="spinner"></div>
     <div id="overlayText">处理中…</div>
     <div class="prog-wrap hidden" id="progWrap"><div class="prog-bar" id="progBar"></div></div>
+    <button id="btnCancel" class="hidden" type="button">取消</button>
   </div>
 </div>
 <div id="toast"></div>
@@ -519,10 +616,32 @@
     clearTimeout(toast._t);
     toast._t = setTimeout(() => toastEl.classList.remove('on'), ms);
   }
-  function busy(on, text = '处理中…') {
-    if (on) overlayText.textContent = text;
+  function busy(on, text = '处理中…', cancellable = false) {
+    if (on) {
+      overlayText.textContent = text;
+      $('btnCancel').classList.toggle('hidden', !cancellable);
+    } else {
+      $('btnCancel').classList.add('hidden');
+    }
     overlay.classList.toggle('on', on);
   }
+
+  /* 取消机制 */
+  let cancelRequested = false;
+  const activeAICtrls = new Set();
+  function resetCancel() { cancelRequested = false; }
+  function isCancelled() { return cancelRequested; }
+  function checkCancelled() {
+    if (cancelRequested) { const e = new Error('已取消'); e.cancelled = true; throw e; }
+  }
+  function isCancelError(e) { return !!(e && e.cancelled); }
+  function requestCancel() {
+    if (cancelRequested) return;
+    cancelRequested = true;
+    toast('正在取消…', 1500);
+    activeAICtrls.forEach(c => { try { c.abort(); } catch (e) {} });
+  }
+  $('btnCancel').addEventListener('click', requestCancel);
   function setProgress(cur, total) {
     const wrap = $('progWrap'), bar = $('progBar');
     if (!total) { wrap.classList.add('hidden'); return; }
@@ -635,6 +754,48 @@
   loadAICfg();
 
   /* ============================================================
+   * 通用设置持久化
+   * ============================================================ */
+  const LS_SETTINGS = 'pdf_splitter_settings_v1';
+  const SETTING_FIELDS = [
+    ['useOutline', 'checked'], ['useTOC', 'checked'], ['useOCR', 'checked'], ['ocrLang', 'value'],
+    ['autoSensitivity', 'value'], ['autoMaxLevel', 'value'], ['autoOnlyDisease', 'checked'],
+    ['autoExtraWords', 'value'], ['autoTitleTop', 'checked'], ['autoTopMargin', 'value'],
+    ['autoCropSame', 'checked'], ['autoZip', 'checked'], ['splitN', 'value'], ['splitZip', 'checked']
+  ];
+  function saveSettings() {
+    try {
+      const o = {};
+      for (const [id, prop] of SETTING_FIELDS) { const el = $(id); if (el) o[id] = el[prop]; }
+      localStorage.setItem(LS_SETTINGS, JSON.stringify(o));
+    } catch (e) {}
+  }
+  function toggleOCRLang() {
+    $('ocrLangField').classList.toggle('hidden', !$('useOCR').checked);
+  }
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(LS_SETTINGS);
+      if (raw) {
+        const o = JSON.parse(raw);
+        for (const [id, prop] of SETTING_FIELDS) {
+          const el = $(id);
+          if (el && o[id] !== undefined) el[prop] = o[id];
+        }
+      }
+    } catch (e) {}
+    toggleOCRLang();
+  }
+  SETTING_FIELDS.forEach(([id]) => {
+    const el = $(id);
+    if (el) el.addEventListener('change', () => {
+      if (id === 'useOCR') toggleOCRLang();
+      saveSettings();
+    });
+  });
+  loadSettings();
+
+  /* ============================================================
    * 文件加载
    * ============================================================ */
   ['dragenter', 'dragover'].forEach(ev =>
@@ -654,6 +815,8 @@
   });
   $('resetBtn').addEventListener('click', reset);
 
+  const EMPTY_HINT_HTML = '还没有识别结果。请点击右侧“开始识别”。';
+
   function reset() {
     pdfBytes = null;
     if (pdfDoc) { try { pdfDoc.destroy(); } catch (e) {} }
@@ -663,6 +826,12 @@
     aiCache = { key: null, items: [] };
     detecting = false;
     extraWordsCache = [];
+    lastLevelFilterKey = '';
+    currentLevelFilter = 'all';
+    editingId = null;
+    forceOCRNext = false;
+    lastExtractionMode = 'text';
+    cancelRequested = false;
 
     // 手动切割状态复位
     manualInited = false;
@@ -676,13 +845,18 @@
     workspace.classList.add('hidden');
     dropZone.classList.remove('hidden');
     $('autoList').innerHTML = '';
+    $('autoEmpty').innerHTML = EMPTY_HINT_HTML;
     $('autoEmpty').classList.remove('hidden');
     $('autoList').classList.add('hidden');
     $('detectStatus').textContent = '';
+    $('autoHint').textContent = '';
     $('autoPreview').textContent = '';
     $('btnAutoSplit').disabled = true;
     $('autoCount').textContent = '0';
     $('levelFilterBar').innerHTML = '';
+    $('addModalMask').classList.remove('on');
+    $('pageCutMask').classList.remove('on');
+    $('previewMask').classList.remove('on');
     hideProgress();
   }
 
@@ -690,6 +864,7 @@
     if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
       toast('请选择 PDF 文件'); return;
     }
+    reset();
     busy(true, '正在读取 PDF…');
     try {
       const buf = await file.arrayBuffer();
@@ -733,6 +908,7 @@
 
     const worker = async () => {
       while (true) {
+        if (cancelRequested) break;
         const p = nextPage++;
         if (p > pageCount) break;
         try {
@@ -799,6 +975,7 @@
 
     const workerCount = Math.min(PERF.EXTRACT_CONCURRENCY, pageCount) || 1;
     await Promise.all(Array.from({ length: workerCount }, worker));
+    if (cancelRequested) { const err = new Error('已取消'); err.cancelled = true; throw err; }
 
     // 按页码顺序扁平化，并重新分配 __idx
     const flat = [];
@@ -810,16 +987,174 @@
     hideProgress();
   }
 
-  async function ensureLines() {
-    if (linesExtracted && allLines.length) return true;
-    busy(true, '正在提取文本层…');
+  /* ============================================================
+   * OCR（扫描版 PDF，Tesseract.js 懒加载）
+   * ============================================================ */
+  let lastExtractionMode = 'text';
+  let forceOCRNext = false;
+  const TESSERACT_CDN = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+  let tesseractLoading = null;
+
+  function loadTesseract() {
+    if (window.Tesseract) return Promise.resolve();
+    if (!tesseractLoading) {
+      tesseractLoading = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = TESSERACT_CDN;
+        s.onload = () => resolve();
+        s.onerror = () => { tesseractLoading = null; reject(new Error('OCR 引擎加载失败，请检查网络')); };
+        document.head.appendChild(s);
+      });
+    }
+    return tesseractLoading;
+  }
+
+  async function ocrExtractAllLines() {
+    await loadTesseract();
+    checkCancelled();
+
+    const lang = $('ocrLang').value || 'chi_sim+eng';
+    busy(true, '正在加载 OCR 语言包…', true);
+    let statusText = '';
+    const worker = await Tesseract.createWorker(lang, 1, {
+      logger: (m) => {
+        if (m && m.status === 'recognizing text') {
+          overlayText.textContent = `${statusText} · ${Math.round((m.progress || 0) * 100)}%`;
+        }
+      }
+    });
+
     try {
-      await extractAllLines();
-      linesExtracted = true;
+      const collected = new Array(pageCount);
+      for (let p = 1; p <= pageCount; p++) {
+        checkCancelled();
+        statusText = `OCR 识别 ${p}/${pageCount}`;
+        overlayText.textContent = statusText + ' · 0%';
+        setProgress(p - 1, pageCount);
+        try {
+          const page = await pdfDoc.getPage(p);
+          const base = page.getViewport({ scale: 1 });
+          pageHeights[p] = base.height;
+          const scale = Math.min(2.2, 2200 / base.width);
+          const vp = page.getViewport({ scale });
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.ceil(vp.width);
+          canvas.height = Math.ceil(vp.height);
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          await page.render({ canvasContext: ctx, viewport: vp }).promise;
+          checkCancelled();
+
+          const { data } = await worker.recognize(canvas, {}, { blocks: true, text: true });
+          let tLines = data.lines || [];
+          if (!tLines.length && data.blocks) {
+            for (const b of data.blocks) {
+              for (const pa of (b.paragraphs || [])) {
+                for (const ln of (pa.lines || [])) tLines.push(ln);
+              }
+            }
+          }
+          if (!tLines.length && data.words && data.words.length) {
+            const ws = data.words.filter(w => w && w.text && w.text.trim() && w.bbox)
+              .sort((a, b) => a.bbox.y0 - b.bbox.y0 || a.bbox.x0 - b.bbox.x0);
+            const groups = [];
+            for (const w of ws) {
+              const g = groups[groups.length - 1];
+              const h = Math.max(6, w.bbox.y1 - w.bbox.y0);
+              if (g && Math.abs(w.bbox.y0 - g.y0) < h * 0.6) {
+                g.words.push(w);
+                g.y0 = Math.min(g.y0, w.bbox.y0);
+                g.y1 = Math.max(g.y1, w.bbox.y1);
+              } else {
+                groups.push({ y0: w.bbox.y0, y1: w.bbox.y1, words: [w] });
+              }
+            }
+            for (const g of groups) {
+              const text = g.words.map(w => w.text).join('').trim();
+              if (!text) continue;
+              tLines.push({ text, bbox: {
+                x0: Math.min(...g.words.map(w => w.bbox.x0)),
+                y0: g.y0,
+                x1: Math.max(...g.words.map(w => w.bbox.x1)),
+                y1: g.y1
+              } });
+            }
+          }
+          if (!tLines.length && data.text && data.text.trim()) {
+            const rows = data.text.split(/\n+/).map(s => s.trim()).filter(Boolean);
+            const step = base.height / (rows.length + 1);
+            rows.forEach((text, i) => tLines.push({ text, __noBBox: true, __row: i, __step: step, __H: base.height }));
+          }
+
+          const pageLines = [];
+          for (const ln of tLines) {
+            const text = String(ln.text || '').replace(/\s+/g, ' ').trim();
+            if (!text) continue;
+            if (typeof ln.confidence === 'number' && ln.confidence < 30) continue;
+            if (ln.__noBBox) {
+              const yTop = ln.__H - ln.__row * ln.__step;
+              pageLines.push({
+                text, x: 0, yTop, yBottom: yTop - ln.__step,
+                height: Math.max(4, ln.__step * 0.8),
+                page: p, font: 'ocr', __idx: 0
+              });
+              continue;
+            }
+            const bb = ln.bbox || {};
+            const x = (bb.x0 || 0) / scale;
+            const yTop = base.height - (bb.y0 || 0) / scale;
+            const yBottom = base.height - (bb.y1 || 0) / scale;
+            pageLines.push({
+              text, x, yTop, yBottom,
+              height: Math.max(4, yTop - yBottom),
+              page: p, font: 'ocr', __idx: 0
+            });
+          }
+          pageLines.sort((a, b) => b.yTop - a.yTop || a.x - b.x);
+          collected[p - 1] = pageLines;
+        } catch (e) {
+          if (isCancelError(e)) throw e;
+          console.warn('OCR page failed', p, e);
+          collected[p - 1] = [];
+        }
+      }
+
+      setProgress(pageCount, pageCount);
+      const flat = [];
+      for (let p = 0; p < pageCount; p++) {
+        const arr = collected[p];
+        if (arr && arr.length) for (const l of arr) { l.__idx = flat.length; flat.push(l); }
+      }
+      allLines = flat;
+      lastExtractionMode = 'ocr';
       return allLines.length > 0;
+    } finally {
+      try { await worker.terminate(); } catch (e) {}
+    }
+  }
+
+  async function ensureLines(forceOCR) {
+    forceOCR = !!forceOCR;
+    if (!forceOCR && linesExtracted && allLines.length) return true;
+
+    busy(true, forceOCR ? '正在启动 OCR…' : '正在提取文本层…', true);
+    try {
+      if (!forceOCR) {
+        await extractAllLines();
+        if (allLines.length) { linesExtracted = true; lastExtractionMode = 'text'; return true; }
+      }
+      if (forceOCR || $('useOCR').checked) {
+        if (!forceOCR) toast('未检测到文字层，启动 OCR 识别…', 3200);
+        const got = await ocrExtractAllLines();
+        linesExtracted = allLines.length > 0;
+        return got;
+      }
+      return false;
     } catch (e) {
+      if (isCancelError(e)) return 'cancelled';
       console.error(e);
-      toast('文本提取失败：' + (e.message || e));
+      toast((forceOCR ? 'OCR 失败：' : '文本提取失败：') + (e.message || e));
       return false;
     } finally {
       busy(false);
@@ -1078,6 +1413,198 @@
   }
 
   /* ============================================================
+   * 公共小工具：标题匹配 / 条目构造 / 合并去重
+   * ============================================================ */
+  function normTitle(s) {
+    const a = cleanDiseaseName(s).replace(/\s+/g, '');
+    return a || String(s || '').replace(/\s+/g, '');
+  }
+
+  function findBestLineOnPage(page, title) {
+    const target = normTitle(title);
+    if (!target || target.length < 2) return null;
+    let best = null, bestScore = 0;
+    for (const l of allLines) {
+      if (l.page !== page) continue;
+      const ln = normTitle(l.text);
+      if (!ln) continue;
+      let sc = 0;
+      if (ln === target) sc = 3;
+      else if (ln.startsWith(target) || (target.startsWith(ln) && ln.length >= 4)) sc = 2;
+      else if (target.length >= 4 && ln.includes(target)) sc = 1;
+      if (sc > bestScore) { bestScore = sc; best = l; if (sc === 3) break; }
+    }
+    return bestScore >= 1 ? best : null;
+  }
+
+  function makeSourceItem(source, prefix, title, rawTitle, page, line, reasons) {
+    const ph = pageHeights[page] || 800;
+    const yTop = line ? line.yTop : ph;
+    const yBottom = line ? line.yBottom : 0;
+    const height = line ? line.height : 14;
+    return {
+      id: prefix + '_' + page + '_' + Math.round(yTop) + '_' + Math.random().toString(36).slice(2, 6),
+      title,
+      rawTitle: rawTitle || title,
+      page, yTop, yBottom, height,
+      level: 0,
+      score: 100,
+      reasons,
+      isDisease: true,
+      source
+    };
+  }
+
+  function mergeDetections(items) {
+    let added = 0;
+    for (const it of items) {
+      const nt = normTitle(it.title);
+      const nr = normTitle(it.rawTitle || it.title);
+      const dup = detected.find(d => {
+        const sameTitle = normTitle(d.title) === nt || normTitle(d.rawTitle || d.title) === nr;
+        const yThresh = Math.max(4, Math.max(d.height || 14, it.height || 14) * 0.6);
+        const closeY = d.page === it.page &&
+          Math.abs(d.yTop - it.yTop) < yThresh &&
+          it.yTop < (pageHeights[it.page] || 800) - 0.5;
+        return sameTitle || closeY;
+      });
+      if (dup) {
+        if (it.isDisease) dup.isDisease = true;
+        for (const r of it.reasons || []) if (!dup.reasons.includes(r)) dup.reasons.push(r);
+        continue;
+      }
+      detected.push(it);
+      selectedDetected.add(it.id);
+      added++;
+    }
+    return added;
+  }
+
+  /* ============================================================
+   * PDF 书签识别
+   * ============================================================ */
+  async function detectFromOutline() {
+    refreshExtraWordsCache();
+    const extraWords = getExtraDiseaseWords();
+    const onlyDisease = $('autoOnlyDisease').checked;
+
+    let outline = null;
+    try { outline = await pdfDoc.getOutline(); } catch (e) { outline = null; }
+    if (!outline || !outline.length) return { items: [], total: 0, hasOutline: false };
+
+    const found = [];
+    const resolveDest = async (dest) => {
+      try {
+        if (typeof dest === 'string') dest = await pdfDoc.getDestination(dest);
+        if (Array.isArray(dest) && dest.length && dest[0] !== null && dest[0] !== undefined) {
+          const idx = await pdfDoc.getPageIndex(dest[0]);
+          if (idx >= 0 && idx < pageCount) return idx + 1;
+        }
+      } catch (e) {}
+      return null;
+    };
+    const walk = async (list) => {
+      for (const it of list) {
+        checkCancelled();
+        const page = await resolveDest(it.dest);
+        if (page) found.push({ title: String(it.title || '').trim(), page });
+        if (it.items && it.items.length) await walk(it.items);
+      }
+    };
+    await walk(outline);
+
+    const items = [];
+    for (const e of found) {
+      if (!e.title || e.title.length < 2) continue;
+      const clean = cleanDiseaseName(e.title) || e.title;
+      const ds = diseaseScore(clean, extraWords);
+      if (onlyDisease && !ds.isDisease) continue;
+      const line = findBestLineOnPage(e.page, e.title);
+      const item = makeSourceItem('outline', 'o', clean, e.title, e.page, line,
+        ['书签' + (ds.isDisease ? '·疾病' : '')]);
+      item.isDisease = ds.isDisease;
+      items.push(item);
+    }
+    return { items, total: found.length, hasOutline: true };
+  }
+
+  /* ============================================================
+   * 目录页解析（自动校准页码偏移）
+   * ============================================================ */
+  function detectFromTOC() {
+    refreshExtraWordsCache();
+    const extraWords = getExtraDiseaseWords();
+    const onlyDisease = $('autoOnlyDisease').checked;
+
+    const STRICT_RE = /^(.{2,60}?)[\s.·．…⋯•・、。]{2,}\s*(\d{1,4})\s*$/;
+    const LOOSE_RE = /^(.{4,60}?)\s+(\d{1,4})\s*$/;
+
+    const byPage = new Map();
+    for (const l of allLines) {
+      const t = l.text.trim();
+      if (t.length < 4 || t.length > 80) continue;
+      const ms = t.match(STRICT_RE);
+      if (!ms) continue;
+      const title = ms[1].replace(/[\s.·．…⋯•・、。]+$/, '').trim();
+      if (title.length < 2 || !/[\u4e00-\u9fa5A-Za-z]/.test(title)) continue;
+      if (!byPage.has(l.page)) byPage.set(l.page, []);
+      byPage.get(l.page).push({ title, printed: +ms[2], page: l.page });
+    }
+    const tocPages = new Set();
+    for (const [p, arr] of byPage) if (arr.length >= 3) tocPages.add(p);
+    if (!tocPages.size) return { items: [], total: 0, pages: 0 };
+
+    const entries = [];
+    for (const [p, arr] of byPage) if (tocPages.has(p)) entries.push(...arr);
+    for (const l of allLines) {
+      if (!tocPages.has(l.page)) continue;
+      const t = l.text.trim();
+      if (STRICT_RE.test(t)) continue;
+      const ml = t.match(LOOSE_RE);
+      if (!ml) continue;
+      const title = ml[1].replace(/[\s.·．…⋯•・、。]+$/, '').trim();
+      if (title.length < 2 || !/[\u4e00-\u9fa5A-Za-z]/.test(title)) continue;
+      entries.push({ title, printed: +ml[2], page: l.page });
+    }
+    if (!entries.length) return { items: [], total: 0, pages: tocPages.size };
+
+    /* 页码偏移投票：目录条目标题在正文中出现的实际页码 - 印刷页码 */
+    const votes = {};
+    for (const e of entries) {
+      const target = normTitle(e.title);
+      if (!target || target.length < 2) continue;
+      for (const l of allLines) {
+        if (tocPages.has(l.page)) continue;
+        const ln = normTitle(l.text);
+        if (ln === target || (target.length >= 4 && ln.startsWith(target))) {
+          const off = l.page - e.printed;
+          votes[off] = (votes[off] || 0) + 1;
+          break;
+        }
+      }
+    }
+    let offset = 0, bestVote = 0;
+    for (const [k, v] of Object.entries(votes)) if (v > bestVote) { bestVote = v; offset = Number(k); }
+    const confident = bestVote >= Math.max(2, Math.ceil(entries.length * 0.15));
+
+    const items = [];
+    for (const e of entries) {
+      const real = e.printed + offset;
+      if (real < 1 || real > pageCount || tocPages.has(real)) continue;
+      const clean = cleanDiseaseName(e.title) || e.title;
+      const ds = diseaseScore(clean, extraWords);
+      if (onlyDisease && !ds.isDisease) continue;
+      const line = findBestLineOnPage(real, e.title);
+      if (!line && !confident) continue;
+      const item = makeSourceItem('toc', 't', clean, e.title, real, line,
+        ['目录页' + (offset ? `·偏移${offset > 0 ? '+' : ''}${offset}` : '')]);
+      item.isDisease = ds.isDisease;
+      items.push(item);
+    }
+    return { items, total: entries.length, pages: tocPages.size, offset, confident };
+  }
+
+  /* ============================================================
    * AI 联网识别
    * ============================================================ */
   const AI_SYSTEM_PROMPT = `你是一个医学教材 PDF 标题识别助手。
@@ -1157,6 +1684,7 @@
 
   async function callAIOnce(cfg, batch) {
     const ctrl = new AbortController();
+    activeAICtrls.add(ctrl);
     const timer = setTimeout(() => ctrl.abort(), PERF.AI_TIMEOUT_MS);
     try {
       const res = await fetch(cfg.endpoint, {
@@ -1186,6 +1714,7 @@
       return parseAIResponse(content);
     } finally {
       clearTimeout(timer);
+      activeAICtrls.delete(ctrl);
     }
   }
 
@@ -1213,13 +1742,14 @@
     const aiItems = [];
     let failed = 0, lastErr = '', done = 0;
 
-    busy(true, `AI 分析中… 0/${batches.length}`);
+    busy(true, `AI 分析中… 0/${batches.length}`, true);
     setProgress(0, batches.length);
 
     // ---- 并发处理，避免被单批串行拖慢 ----
     let idx = 0;
     const worker = async () => {
       while (true) {
+        if (cancelRequested) break;
         const i = idx++;
         if (i >= batches.length) break;
         try {
@@ -1241,6 +1771,11 @@
 
     busy(false);
     hideProgress();
+
+    if (cancelRequested) {
+      toast('AI 分析已取消');
+      return { ok: false, count: 0, cancelled: true };
+    }
 
     if (failed === batches.length) {
       toast('AI 分析全部失败：' + lastErr, 6000);
@@ -1313,21 +1848,28 @@
   async function runDetection() {
     if (!pdfDoc || detecting) return;
     detecting = true;
+    resetCancel();
 
     try {
-      busy(true, '正在提取文本层…');
-      const ok = await ensureLines();
-      busy(false);
-      hideProgress();
+      const forceOCR = forceOCRNext;
+      forceOCRNext = false;
 
+      const ok = await ensureLines(forceOCR);
+
+      if (ok === 'cancelled') { toast('已取消'); return; }
       if (!ok) {
-        toast('未检测到文本层（可能是扫描版或图片 PDF）');
-        $('detectStatus').textContent = '⚠ 该 PDF 没有可提取的文字层';
-        $('autoEmpty').innerHTML = '该 PDF 是扫描版或图片型，无法自动识别疾病。<br>请使用“手动切割”功能。';
+        const msg = lastExtractionMode === 'ocr'
+          ? 'OCR 未识别到文字，请检查扫描清晰度或更换 OCR 语言'
+          : '未检测到文本层（可能是扫描版或图片 PDF）';
+        toast(msg, 4000);
+        $('detectStatus').textContent = '⚠ ' + msg;
+        $('autoEmpty').innerHTML =
+          '该 PDF 是扫描版或图片型，无法直接识别疾病。<br>' +
+          '可勾选右侧“🔍 无文字层时自动 OCR”，或点击“📷 对扫描版执行 OCR”。';
         return;
       }
 
-      busy(true, '正在本地识别标题…');
+      busy(true, '正在本地识别标题…', true);
       let localCount = 0, diseaseCount = 0;
       try {
         refreshExtraWordsCache();   // 只解析一次
@@ -1342,6 +1884,7 @@
         localCount = detected.length;
         diseaseCount = r.diseaseCount;
         selectedDetected = new Set(detected.map(c => c.id));
+        lastLevelFilterKey = '';
         renderDetected();
       } catch (e) {
         console.error(e);
@@ -1349,34 +1892,64 @@
       }
       busy(false);
 
-      if ($('useAI').checked) {
-        let aiRes = { ok: false, count: 0 };
+      /* ---- 书签识别 ---- */
+      let outlineAdded = 0, outlineTotal = 0;
+      if ($('useOutline').checked && !cancelRequested) {
+        try {
+          const r = await detectFromOutline();
+          outlineTotal = r.total;
+          outlineAdded = mergeDetections(r.items);
+          if (outlineAdded) { lastLevelFilterKey = ''; renderDetected(); }
+        } catch (e) {
+          if (isCancelError(e)) { toast('已取消'); return; }
+          console.error(e);
+        }
+      }
+
+      /* ---- 目录页解析 ---- */
+      let tocAdded = 0, tocTotal = 0, tocOffset = 0;
+      if ($('useTOC').checked && !cancelRequested) {
+        try {
+          const r = detectFromTOC();
+          tocTotal = r.total;
+          tocOffset = r.offset || 0;
+          tocAdded = mergeDetections(r.items);
+          if (tocAdded) { lastLevelFilterKey = ''; renderDetected(); }
+        } catch (e) { console.error(e); }
+      }
+
+      /* ---- AI 联网识别 ---- */
+      let aiRes = { ok: false, count: 0 };
+      if ($('useAI').checked && !cancelRequested) {
         try {
           aiRes = await runAIDetection();
         } catch (e) {
           console.error(e);
           toast('AI 分析异常：' + (e.message || e));
         }
-
-        const modeText = $('autoOnlyDisease').checked ? '（仅疾病）' : '';
-        if (aiRes.ok) {
-          const extra = aiRes.cached ? '（缓存）' : '';
-          $('detectStatus').innerHTML =
-            `本地 ${localCount} 条 · AI 新增 ${aiRes.count} 条${extra} · 合计 ${detected.length} 条` +
-            ' <span style="color:#7c3aed">🤖 AI 已启用</span>';
-        } else {
-          $('detectStatus').textContent =
-            `本地识别 ${localCount} 条${modeText} · AI 未完成，已回退到本地结果`;
-        }
-      } else {
-        const modeText = $('autoOnlyDisease').checked ? '（仅疾病标题）' : '（含非疾病标题）';
-        $('detectStatus').textContent =
-          `扫描 ${allLines.length} 行 · 识别 ${localCount} 个标题${modeText}，其中疾病 ${diseaseCount} 个`;
       }
+
+      if (cancelRequested) { toast('已取消'); renderDetected(); return; }
+
+      const parts = [`扫描 ${allLines.length} 行`, `本地 ${localCount} 条(疾病${diseaseCount})`];
+      if (outlineTotal) parts.push(`书签 ${outlineAdded}/${outlineTotal} 条`);
+      if (tocTotal) parts.push(`目录 ${tocAdded}/${tocTotal} 条${tocOffset ? `(偏移${tocOffset > 0 ? '+' : ''}${tocOffset})` : ''}`);
+      if ($('useAI').checked) {
+        parts.push(aiRes.ok
+          ? `AI 新增 ${aiRes.count} 条${aiRes.cached ? '(缓存)' : ''}`
+          : 'AI 未完成');
+      }
+      const modeText = $('autoOnlyDisease').checked ? '（仅疾病）' : '（含非疾病标题）';
+      $('detectStatus').innerHTML =
+        `${parts.join(' · ')} · 合计 ${detected.length} 条${modeText}` +
+        (lastExtractionMode === 'ocr' ? ' · <span style="color:#0284c7">📷 OCR</span>' : '') +
+        (aiRes.ok ? ' <span style="color:#7c3aed">🤖 AI</span>' : '');
 
       renderDetected();
     } finally {
       detecting = false;
+      busy(false);
+      hideProgress();
     }
   }
 
@@ -1448,8 +2021,14 @@
     let badgeHtml;
     if (item.source === 'ai') {
       badgeHtml = `<span class="ai-badge" title="由 AI 识别">🤖 AI</span>`;
+    } else if (item.source === 'outline') {
+      badgeHtml = `<span class="outline-tag" title="来自 PDF 书签">🔖 书签</span>`;
+    } else if (item.source === 'toc') {
+      badgeHtml = `<span class="toc-tag" title="来自目录页解析">📑 目录</span>`;
     } else if (item.source === 'manual') {
       badgeHtml = `<span class="ai-badge">手动</span>`;
+    } else if (item.source === 'import') {
+      badgeHtml = `<span class="import-tag" title="导入的条目">导入</span>`;
     } else if (item.isDisease) {
       const label = item.aiConfirmed ? '疾病✓AI' : '疾病';
       badgeHtml = `<span class="disease-tag" title="${escapeHtml((item.reasons || []).join('、'))}">${label}</span>`;
@@ -1459,15 +2038,21 @@
 
     const scoreText = item.source === 'ai' ? 'AI'
                     : item.source === 'manual' ? '手动'
+                    : item.source === 'outline' ? '书签'
+                    : item.source === 'toc' ? '目录'
+                    : item.source === 'import' ? '导入'
                     : '评分 ' + item.score;
+
+    const pageText = 'p' + item.page + (item.endPage ? '-' + item.endPage : '');
 
     row.innerHTML = `
       <input type="checkbox"${selectedDetected.has(item.id) ? ' checked' : ''}>
-      <span class="page-tag">p${item.page}</span>
+      <span class="page-tag">${pageText}</span>
       <span class="level-tag level-${item.level}">${LEVEL_NAMES[item.level] || '—'}</span>
       ${badgeHtml}
       <input type="text" class="title-input" value="${escapeHtml(item.title)}" title="点击可修改标题">
       <span class="score-tag" title="${escapeHtml((item.reasons || []).join('、'))}">${scoreText}</span>
+      <button class="edit-btn" title="编辑标题/起止页">✎</button>
       <button class="del-btn" title="删除">×</button>
     `;
     return row;
@@ -1484,6 +2069,9 @@
     if (items.length === 0) {
       $('autoEmpty').classList.remove('hidden');
       listEl.classList.add('hidden');
+      $('autoEmpty').innerHTML = (detected.length && currentLevelFilter !== 'all')
+        ? '该层级没有识别结果，请切换到“全部”查看。'
+        : EMPTY_HINT_HTML;
       updateSelectionStats(items);
       return;
     }
@@ -1522,10 +2110,12 @@
 
   $('autoList').addEventListener('click', (e) => {
     const btn = e.target;
-    if (!btn.classList || !btn.classList.contains('del-btn')) return;
-    const row = btn.closest('.auto-item');
+    if (!btn.classList) return;
+    const row = btn.closest ? btn.closest('.auto-item') : null;
     if (!row) return;
     const id = row.dataset.id;
+    if (btn.classList.contains('edit-btn')) { openEditItem(id); return; }
+    if (!btn.classList.contains('del-btn')) return;
     detected = detected.filter(d => d.id !== id);
     selectedDetected.delete(id);
     lastLevelFilterKey = '';    // 层级统计可能变化
@@ -1546,7 +2136,11 @@
   $('autoSensitivity').addEventListener('change', debouncedRerun);
   $('autoMaxLevel').addEventListener('change', debouncedRerun);
   $('autoOnlyDisease').addEventListener('change', debouncedRerun);
+  $('useOutline').addEventListener('change', debouncedRerun);
+  $('useTOC').addEventListener('change', debouncedRerun);
   $('autoExtraWords').addEventListener('input', debouncedExtra);
+
+  $('btnOCRNow').addEventListener('click', () => { forceOCRNext = true; runDetection(); });
 
   document.querySelectorAll('.quick button[data-auto-act]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1562,35 +2156,69 @@
     });
   });
 
-  $('btnAddManual').addEventListener('click', () => {
+  let editingId = null;
+  function openAddModal() {
+    editingId = null;
+    document.querySelector('#addModalMask h3').textContent = '手动添加疾病';
     $('addPage').value = 1;
     $('addPage').max = pageCount;
     $('addTitle').value = '';
+    $('addEndPage').value = '';
+    $('addLevel').value = '4';
     $('addModalMask').classList.add('on');
-  });
+  }
+  function openEditItem(id) {
+    const item = detected.find(d => d.id === id);
+    if (!item) return;
+    editingId = id;
+    document.querySelector('#addModalMask h3').textContent = '编辑条目';
+    $('addPage').value = item.page;
+    $('addPage').max = pageCount;
+    $('addTitle').value = item.title;
+    $('addEndPage').value = item.endPage || '';
+    $('addLevel').value = String(item.level || 0);
+    $('addModalMask').classList.add('on');
+  }
+  $('btnAddManual').addEventListener('click', openAddModal);
   $('addCancel').addEventListener('click', () => $('addModalMask').classList.remove('on'));
   $('addConfirm').addEventListener('click', () => {
     const page = Math.max(1, Math.min(pageCount, parseInt($('addPage').value, 10) || 1));
     const title = ($('addTitle').value || '').trim();
     const level = parseInt($('addLevel').value, 10) || 0;
+    const epRaw = parseInt($('addEndPage').value, 10);
+    const endPage = isNaN(epRaw) ? null : Math.max(1, Math.min(pageCount, epRaw));
     if (!title) { toast('请输入疾病名称'); return; }
+    if (endPage && endPage < page) { toast('结束页不能小于起始页'); return; }
 
-    const ph = pageHeights[page] || 800;
-    const item = {
-      id: 'm_' + Date.now() + '_' + detected.length,
-      title, page,
-      yTop: ph, yBottom: 0,
-      level, score: 999,
-      reasons: ['手动'],
-      isDisease: true,
-      source: 'manual'
-    };
-    detected.push(item);
-    selectedDetected.add(item.id);
+    const wasEdit = !!editingId;
+    if (wasEdit) {
+      const item = detected.find(d => d.id === editingId);
+      if (item) {
+        item.title = title;
+        item.page = page;
+        item.level = level;
+        if (endPage) item.endPage = endPage; else delete item.endPage;
+      }
+      editingId = null;
+    } else {
+      const ph = pageHeights[page] || 800;
+      const item = {
+        id: 'm_' + Date.now() + '_' + detected.length,
+        title, page,
+        yTop: ph, yBottom: 0, height: 14,
+        level, score: 999,
+        reasons: ['手动'],
+        isDisease: true,
+        source: 'manual'
+      };
+      if (endPage) item.endPage = endPage;
+      detected.push(item);
+      selectedDetected.add(item.id);
+    }
     lastLevelFilterKey = '';
     renderDetected();
     $('addModalMask').classList.remove('on');
-    toast('已添加：' + title);
+    toast(wasEdit ? '已保存修改' : '已添加：' + title);
   });
 
   $('autoTitleTop').addEventListener('change', () => {
@@ -1599,8 +2227,220 @@
   $('autoMarginField').classList.toggle('hidden', !$('autoTitleTop').checked);
 
   /* ============================================================
+   * 识别结果 导入 / 导出
+   * ============================================================ */
+  function sortedDetected() {
+    return detected.slice().sort((a, b) => a.page - b.page || b.yTop - a.yTop);
+  }
+
+  $('btnExportJSON').addEventListener('click', () => {
+    if (!detected.length) { toast('没有可导出的识别结果'); return; }
+    const data = {
+      file: currentFileName,
+      exportedAt: new Date().toISOString(),
+      items: sortedDetected().map(d => ({
+        title: d.title,
+        page: d.page,
+        endPage: d.endPage || null,
+        yTop: Math.round(d.yTop),
+        yBottom: Math.round(d.yBottom),
+        level: d.level,
+        isDisease: !!d.isDisease,
+        source: d.source || 'auto'
+      }))
+    };
+    download(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
+      baseName() + '_识别结果.json');
+    toast('已导出 JSON');
+  });
+
+  $('btnExportCSV').addEventListener('click', () => {
+    if (!detected.length) { toast('没有可导出的识别结果'); return; }
+    const esc = (v) => {
+      const s = String(v === null || v === undefined ? '' : v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const rows = [['起始页', '结束页', '标题', '层级', '是否疾病', '来源']];
+    sortedDetected().forEach(d => {
+      rows.push([d.page, d.endPage || '', d.title, d.level, d.isDisease ? '是' : '否', d.source || 'auto']);
+    });
+    const csv = rows.map(r => r.map(esc).join(',')).join('\r\n');
+    download(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }),
+      baseName() + '_识别结果.csv');
+    toast('已导出 CSV');
+  });
+
+  $('btnImportJSON').addEventListener('click', () => $('importInput').click());
+  $('importInput').addEventListener('change', async () => {
+    const f = $('importInput').files[0];
+    $('importInput').value = '';
+    if (!f) return;
+    if (!pdfDoc) { toast('请先打开一个 PDF，再导入识别结果'); return; }
+    try {
+      const text = await f.text();
+      const data = JSON.parse(text);
+      const arr = Array.isArray(data) ? data : (Array.isArray(data.items) ? data.items : []);
+      if (!arr.length) { toast('文件中没有识别条目'); return; }
+
+      let added = 0;
+      for (const raw of arr) {
+        const title = String(raw.title || '').trim();
+        const page = parseInt(raw.page, 10);
+        if (!title || !page || page < 1 || page > pageCount) continue;
+        const ph = pageHeights[page] || 800;
+        const yTop = Number.isFinite(+raw.yTop) && +raw.yTop > 0 && +raw.yTop <= ph ? +raw.yTop : ph;
+        const yBottom = Number.isFinite(+raw.yBottom) ? +raw.yBottom : 0;
+        const item = {
+          id: 'i_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+          title, rawTitle: title, page,
+          yTop, yBottom,
+          height: Math.max(4, yTop - yBottom),
+          level: parseInt(raw.level, 10) || 0,
+          score: 100,
+          reasons: ['导入'],
+          isDisease: raw.isDisease !== false,
+          source: 'import'
+        };
+        const ep = parseInt(raw.endPage, 10);
+        if (!isNaN(ep) && ep >= page) item.endPage = Math.min(ep, pageCount);
+        detected.push(item);
+        selectedDetected.add(item.id);
+        added++;
+      }
+      lastLevelFilterKey = '';
+      renderDetected();
+      toast(`已导入 ${added} 条识别结果`);
+    } catch (e) {
+      toast('导入失败：' + (e.message || e));
+    }
+  });
+
+  /* ============================================================
    * 按识别结果拆分
    * ============================================================ */
+  /* ---- 拆分计划（含结束页覆盖、重名编号） ---- */
+  function computeSplitPlan(items) {
+    const titleCounter = {}, titleUsed = {};
+    for (const d of items) {
+      const t = sanitize(cleanDiseaseName(d.title)) || '未命名疾病';
+      titleCounter[t] = (titleCounter[t] || 0) + 1;
+    }
+    const plan = [];
+    for (let i = 0; i < items.length; i++) {
+      const d = items[i];
+      const next = items[i + 1] || null;
+      const startPage = d.page;
+      const endPage = d.endPage
+        ? Math.min(Math.max(d.endPage, d.page), pageCount)
+        : (next ? next.page : pageCount);
+      if (startPage > endPage) continue;
+      const baseTitle = sanitize(cleanDiseaseName(d.title)) || '未命名疾病';
+      let fileName;
+      if (titleCounter[baseTitle] > 1) {
+        titleUsed[baseTitle] = (titleUsed[baseTitle] || 0) + 1;
+        fileName = `${baseTitle}_${titleUsed[baseTitle]}.pdf`;
+      } else {
+        fileName = `${baseTitle}.pdf`;
+      }
+      plan.push({ d, next, startPage, endPage, fileName });
+    }
+    return plan;
+  }
+
+  /* ---- 拆分预览弹窗 ---- */
+  const previewMask = $('previewMask');
+  let previewPlan = [], previewOpts = null, previewResolve = null, previewToken = 0;
+
+  function openSplitPreview(plan, opts) {
+    return new Promise((resolve) => {
+      previewResolve = resolve;
+      previewPlan = plan;
+      previewOpts = opts;
+      previewMask.classList.add('on');
+      $('previewSummary').textContent = `共 ${plan.length} 个文件`;
+      const list = $('previewList');
+      list.innerHTML = '';
+      const frag = document.createDocumentFragment();
+      plan.forEach((p, i) => {
+        const row = document.createElement('div');
+        row.className = 'pv-item';
+        row.dataset.i = String(i);
+        const range = p.startPage === p.endPage ? `p${p.startPage}` : `p${p.startPage}-${p.endPage}`;
+        row.innerHTML = `<span class="page-tag">${range}</span>
+          <span class="pv-name" title="${escapeHtml(p.fileName)}">${escapeHtml(p.fileName)}</span>
+          <span class="pv-pages">${p.endPage - p.startPage + 1}页</span>`;
+        row.addEventListener('click', () => selectSplitPreview(i));
+        frag.appendChild(row);
+      });
+      list.appendChild(frag);
+      selectSplitPreview(0);
+    });
+  }
+  function closeSplitPreview(ok) {
+    previewMask.classList.remove('on');
+    const r = previewResolve;
+    previewResolve = null;
+    if (r) r(ok);
+  }
+  function selectSplitPreview(i) {
+    if (!previewPlan.length) return;
+    i = Math.max(0, Math.min(previewPlan.length - 1, i));
+    $('previewList').querySelectorAll('.pv-item').forEach(el =>
+      el.classList.toggle('active', Number(el.dataset.i) === i));
+    renderSplitPreview(i);
+  }
+  async function renderSplitPreview(i) {
+    const p = previewPlan[i];
+    if (!p) return;
+    const token = ++previewToken;
+    const canvas = $('previewCanvas');
+    const d = p.d;
+    try {
+      const page = await pdfDoc.getPage(p.startPage);
+      const base = page.getViewport({ scale: 1 });
+      const stage = $('previewStage');
+      const maxW = Math.max(220, stage.clientWidth - 40);
+      const maxH = Math.max(220, window.innerHeight * 0.5);
+      const s = Math.min(maxW / base.width, maxH / base.height);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const vp = page.getViewport({ scale: s * dpr });
+      if (token !== previewToken) return;
+      canvas.width = Math.round(vp.width);
+      canvas.height = Math.round(vp.height);
+      canvas.style.width = Math.round(base.width * s) + 'px';
+      canvas.style.height = Math.round(base.height * s) + 'px';
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport: vp }).promise;
+      if (token !== previewToken) return;
+
+      const H = base.height;
+      let cropTop = H, cropBottom = 0;
+      if (previewOpts.titleTop) {
+        const desiredTop = Math.min(H, d.yTop + previewOpts.topMargin);
+        if (desiredTop < H - 2) cropTop = desiredTop;
+      }
+      if (previewOpts.cropSame && p.next && p.next.page === p.endPage) {
+        const desiredBottom = Math.max(0, p.next.yTop + 2);
+        if (desiredBottom > 2 && desiredBottom < H - 5) cropBottom = desiredBottom;
+      }
+      $('pvDarkTop').style.top = '0';
+      $('pvDarkTop').style.height = ((H - cropTop) / H * 100) + '%';
+      $('pvDarkBottom').style.top = ((H - cropBottom) / H * 100) + '%';
+      $('pvDarkBottom').style.height = (cropBottom / H * 100) + '%';
+      $('previewCap').textContent =
+        `${p.fileName} · 第 ${p.startPage}-${p.endPage} 页（共 ${p.endPage - p.startPage + 1} 页）` +
+        (p.endPage > p.startPage ? ' · 预览为首页裁切效果' : '');
+    } catch (e) {
+      console.error(e);
+      $('previewCap').textContent = '预览渲染失败：' + (e.message || e);
+    }
+  }
+  $('previewCancelBtn').addEventListener('click', () => closeSplitPreview(false));
+  $('previewConfirmBtn').addEventListener('click', () => closeSplitPreview(true));
+  previewMask.addEventListener('click', (e) => { if (e.target === previewMask) closeSplitPreview(false); });
+
   $('btnAutoSplit').addEventListener('click', async () => {
     if (selectedDetected.size === 0) { toast('请至少选择一个疾病'); return; }
 
@@ -1614,30 +2454,25 @@
     const cropSame = $('autoCropSame').checked;
     const topMargin = Math.max(0, Math.min(80, parseInt($('autoTopMargin').value, 10) || 10));
 
-    busy(true, `正在拆分（共 ${items.length} 个文件）…`);
+    const plan = computeSplitPlan(items);
+    if (!plan.length) { toast('没有可拆分的疾病'); return; }
+
+    const ok = await openSplitPreview(plan, { titleTop, cropSame, topMargin });
+    if (!ok) return;
+
+    resetCancel();
+    busy(true, `正在拆分（共 ${plan.length} 个文件）…`, true);
     try {
       const src = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
       const files = [];
 
-      // 预统计：同名疾病需要加序号
-      const titleCounter = {};
-      const titleUsed = {};
-      for (const d of items) {
-        const t = sanitize(cleanDiseaseName(d.title)) || '未命名疾病';
-        titleCounter[t] = (titleCounter[t] || 0) + 1;
-      }
-
-      for (let i = 0; i < items.length; i++) {
-        const d = items[i];
-        const next = items[i + 1];
-
-        const startPage = d.page;
-        const endPage = next ? next.page : pageCount;
-        if (startPage > endPage) continue;
+      for (const p of plan) {
+        checkCancelled();
+        const { d, next, startPage, endPage } = p;
 
         const out = await PDFDocument.create();
         const indices = [];
-        for (let p = startPage; p <= endPage; p++) indices.push(p - 1);
+        for (let pg = startPage; pg <= endPage; pg++) indices.push(pg - 1);
         const copied = await out.copyPages(src, indices);
 
         for (let k = 0; k < copied.length; k++) {
@@ -1670,18 +2505,7 @@
         }
 
         const bytes = await out.save();
-
-        // 生成文件名：只保留疾病名，重名加序号
-        const baseTitle = sanitize(cleanDiseaseName(d.title)) || '未命名疾病';
-        let fileName;
-        if (titleCounter[baseTitle] > 1) {
-          titleUsed[baseTitle] = (titleUsed[baseTitle] || 0) + 1;
-          fileName = `${baseTitle}_${titleUsed[baseTitle]}.pdf`;
-        } else {
-          fileName = `${baseTitle}.pdf`;
-        }
-
-        files.push({ name: fileName, bytes });
+        files.push({ name: p.fileName, bytes });
       }
 
       if (files.length === 0) { toast('没有生成任何文件'); return; }
@@ -1700,8 +2524,8 @@
         toast(`已下载 ${files.length} 个文件`);
       }
     } catch (e) {
-      console.error(e);
-      toast('拆分失败：' + (e.message || e));
+      if (isCancelError(e)) toast('已取消拆分');
+      else { console.error(e); toast('拆分失败：' + (e.message || e)); }
     } finally {
       busy(false);
     }
@@ -1727,6 +2551,7 @@
   async function initManualView() {
     if (manualInited) return;
     manualInited = true;
+    resetCancel();
 
     const thumbsEl = $('thumbs');
     thumbsEl.innerHTML = '';
@@ -1832,6 +2657,7 @@
     async function worker() {
       while (true) {
         const i = nextP++; if (i > pageCount) break;
+        if (cancelRequested) break;
         try { await renderThumb(i); } catch (e) {}
       }
     }
@@ -1886,11 +2712,13 @@
       const chunks = [];
       for (let i = 0; i < pages.length; i += n) chunks.push(pages.slice(i, i + n));
 
-      busy(true, `正在拆分（共 ${chunks.length} 个文件）…`);
+      resetCancel();
+      busy(true, `正在拆分（共 ${chunks.length} 个文件）…`, true);
       try {
         const src = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
         const files = [];
         for (const chunk of chunks) {
+          checkCancelled();
           const out = await PDFDocument.create();
           const cp = await out.copyPages(src, chunk.map(p => p - 1));
           cp.forEach(p => out.addPage(p));
@@ -1907,7 +2735,7 @@
           for (const f of files) { download(f.bytes, f.name); await sleep(350); }
         }
         toast('已完成');
-      } catch (e) { toast('失败：' + e.message); }
+      } catch (e) { toast(isCancelError(e) ? '已取消' : '失败：' + e.message); }
       finally { busy(false); }
     };
 
@@ -1922,6 +2750,7 @@
     let cutPageNum = 1;
     let cuts = [];          // 当前编辑的切割线比例（0~1，从页面顶部算）
     let dragIdx = -1, dragStartY = 0, dragMoved = false;
+    let pcRenderTask = null;
 
     // 显示比例 → PDF 坐标系 y（自页面底部算起）
     function ratioToPdfY(p, angle, H) {
@@ -1961,6 +2790,7 @@
       pcMask.classList.add('on');
       renderLines();
 
+      if (pcRenderTask) { try { pcRenderTask.cancel(); } catch (e) {} pcRenderTask = null; }
       pcCanvas.width = 0; pcCanvas.height = 0;
       pcCanvas.style.width = '0px'; pcCanvas.style.height = '0px';
 
@@ -1984,7 +2814,14 @@
         const ctx = pcCanvas.getContext('2d');
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, pcCanvas.width, pcCanvas.height);
-        await page.render({ canvasContext: ctx, viewport: vp }).promise;
+        const task = page.render({ canvasContext: ctx, viewport: vp });
+        pcRenderTask = task;
+        try {
+          await task.promise;
+        } catch (e) {
+          if (!(e && e.name === 'RenderingCancelledException')) console.error(e);
+        }
+        if (pcRenderTask === task) pcRenderTask = null;
       } catch (e) {
         console.error(e);
         toast('预览渲染失败：' + (e.message || e));
@@ -2147,13 +2984,15 @@
     $('btnCutExport').onclick = async () => {
       if (!pageCuts.size) { toast('还没有配置页内切割'); return; }
 
-      busy(true, '正在导出切割片段…');
+      resetCancel();
+      busy(true, '正在导出切割片段…', true);
       try {
         const src = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
         const files = [];
         const pages = [...pageCuts.keys()].sort((a, b) => a - b);
 
         for (const pn of pages) {
+          checkCancelled();
           if (pn < 1 || pn > src.getPageCount()) continue;
           const srcPage = src.getPage(pn - 1);
           const { width, height } = srcPage.getSize();
@@ -2188,8 +3027,8 @@
         download(blob, `${baseName()}_页内切割_${files.length}份.zip`);
         toast(`已导出 ${files.length} 个片段`);
       } catch (e) {
-        console.error(e);
-        toast('导出失败：' + (e.message || e));
+        if (isCancelError(e)) toast('已取消导出');
+        else { console.error(e); toast('导出失败：' + (e.message || e)); }
       } finally {
         busy(false);
       }
@@ -2203,8 +3042,8 @@
   }
 
 })();
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 </script>
 </body>

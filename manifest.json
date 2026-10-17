@@ -1,20 +1,17 @@
 {
-  "name": "PDF 智能切割",
-  "short_name": "PDF切割",
+  "name": "PDF 智能切割 · 自动识别疾病",
+  "short_name": "PDF 切割",
+  "description": "本地识别 PDF 疾病标题并拆分，支持书签、目录页、OCR 与 AI 联网多引擎",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f5f6f8",
   "theme_color": "#4f46e5",
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ]
 }

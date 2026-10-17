@@ -1,7 +1,10 @@
-const CACHE = 'pdf-splitter-v1';
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./index.html'])));
+/* PDF 智能切割 Service Worker
+ * 仅用于满足 PWA 安装条件；不劫持任何请求，避免缓存旧版本页面。
+ */
+self.addEventListener('install', () => {
+  self.skipWaiting();
 });
-self.addEventListener('fetch', e => {
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
 });
