@@ -355,8 +355,8 @@
             <label for="autoMaxLevel">最大层级深度</label>
             <select id="autoMaxLevel">
               <option value="3">识别到“一、”级（3 层）</option>
-              <option value="4" selected>识别到“（一）”级（4 层）</option>
-              <option value="5">识别到“1.”级（5 层）</option>
+              <option value="4">识别到“（一）”级（4 层）</option>
+              <option value="5" selected>识别到“1.”级（5 层，推荐）</option>
             </select>
           </div>
 
@@ -833,6 +833,7 @@
   $('resetBtn').addEventListener('click', reset);
 
   const EMPTY_HINT_HTML = '还没有识别结果。请点击右侧“开始识别”。';
+  let emptyHintOverride = '';
 
   function reset() {
     pdfBytes = null;
@@ -849,6 +850,7 @@
     forceOCRNext = false;
     lastExtractionMode = 'text';
     cancelRequested = false;
+    emptyHintOverride = '';
 
     // 手动切割状态复位
     manualInited = false;
@@ -949,6 +951,7 @@
                 str: i.str,
                 x: i.transform[4],
                 y: i.transform[5],
+                w: i.width || 0,
                 h: Math.abs(i.height) || Math.abs(i.transform[3]) || 12,
                 font: i.fontName || ''
               }));
@@ -969,6 +972,18 @@
                 row.sort((a, b) => a.x - b.x);
                 const text = row.map(w => w.str).join('').replace(/\s+/g, ' ').trim();
                 if (!text) continue;
+                // 合并同一字体的连续片段，供“行内小标题”切分使用
+                const runs = [];
+                for (const w of row) {
+                  const last = runs[runs.length - 1];
+                  if (last && last.font === w.font) {
+                    last.text += w.str;
+                    last.x1 = w.x + w.w;
+                  } else {
+                    runs.push({ text: w.str, font: w.font, x0: w.x, x1: w.x + w.w });
+                  }
+                }
+                for (const r of runs) r.text = r.text.replace(/\s+/g, ' ').trim();
                 pageLines.push({
                   text,
                   x: Math.min(...row.map(w => w.x)),
@@ -977,6 +992,7 @@
                   height: Math.max(...row.map(w => w.h)),
                   page: p,
                   font: row[0].font,
+                  runs: runs.filter(r => r.text),
                   __idx: 0
                 });
               }
@@ -1203,7 +1219,7 @@
     { level:4, bonus:3, type:'括号中文', re:/^[（(]\s*[一二三四五六七八九十百千]+\s*[）)]/ },
     { level:4, bonus:2, type:'圈号',     re:/^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/ },
     { level:5, bonus:2, type:'括号数字', re:/^[（(]\s*\d{1,3}\s*[）)]/ },
-    { level:5, bonus:2, type:'数字序号', re:/^\d{1,3}\s*[.．、](?!\d)/ },
+    { level:5, bonus:4, type:'数字序号', re:/^\d{1,3}\s*[.．、](?!\d)/ },
     { level:5, bonus:2, type:'数字右括号', re:/^\d{1,3}\s*[）)]/ }
   ];
 
@@ -1215,6 +1231,40 @@
       if (r.re.test(t)) return { level: r.level, type: r.type, bonus: r.bonus + (hasBar ? 1 : 0) };
     }
     return null;
+  }
+
+  /* 行内小标题（run-in heading）：标题与正文排在同一行，
+     如“1. 可利用的能量形式机体利用的能量来源于…”，标题片段与正文之间
+     常有字体变化或明显空隙（间隙约一个全角空格）。识别后返回标题文本。 */
+  function splitRunInHeading(line) {
+    const runs = line.runs;
+    if (!runs || runs.length < 2) return null;
+    const title = (runs[0].text || '').trim();
+    if (!title || title.length > 30) return null;
+    if (!matchNumbering(title)) return null;
+
+    const second = runs[1];
+    const gap = second.x0 - runs[0].x1;
+    const fontChanged = second.font !== runs[0].font;
+    if (!fontChanged && !(gap > line.height * 0.55)) return null;
+
+    // 标题片段去掉编号后必须还有实际文字，避免把“第一节”这类
+    // 仅含编号的片段误当作标题切出
+    const body = title
+      .replace(/^第\s*[一二三四五六七八九十百千零〇\d]+\s*[章篇部节]/, '')
+      .replace(/^\[?附\s*(?:篇|录|表|图|注|则|件)\]?/, '')
+      .replace(/^§\s*\d+/, '')
+      .replace(/^[（(]\s*[一二三四五六七八九十百千\d]+\s*[）)]/, '')
+      .replace(/^[一二三四五六七八九十百千]+\s*[、.．]/, '')
+      .replace(/^\d{1,3}\s*[.．、）)]/, '')
+      .replace(/^[IVXLCDM]{1,6}\s*[.．、]/, '')
+      .replace(/^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳]/, '')
+      .trim();
+    if (body.length < 2) return null;
+    if (!/[\u4e00-\u9fa5A-Za-z]$/.test(title)) return null;
+    if (/[。；;：:]$/.test(title)) return null;
+
+    return { title };
   }
 
   const DISEASE_SUFFIX_LIST = [
@@ -1317,7 +1367,7 @@
       }
     }
     if (/疾病$/.test(t) && t.length <= 14) return { score: -6, why: ['疾病分类'], isDisease: false };
-    if (/(系统|器官|部位|组织)$/.test(t))  return { score: -5, why: ['解剖系统'], isDisease: false };
+    if (/(系统|器官|部位|组织)$/.test(t))  return { score: -1, why: ['解剖系统'], isDisease: false };
 
     if (DISEASE_SUFFIX_RE.test(t)) {
       let s = 5; const why = ['疾病后缀'];
@@ -1349,7 +1399,7 @@
     const medianH = heights.length ? heights[Math.floor(heights.length * 0.55)] : 12;
 
     // 页眉页脚识别
-    const hfCounter = {};
+    const hfStats = {};
     const minRepeat = Math.max(3, Math.floor(pageCount * 0.2));
     for (const line of lines) {
       const ph = pageHeights[line.page];
@@ -1357,11 +1407,21 @@
       const relY = line.yBottom / ph;
       if (relY > 0.94 || relY < 0.06) {
         const key = normalizeHF(line.text);
-        if (key.length >= 2) hfCounter[key] = (hfCounter[key] || 0) + 1;
+        if (key.length >= 2) {
+          const st = hfStats[key] || (hfStats[key] = { count: 0, heights: [] });
+          st.count++;
+          st.heights.push(line.height);
+        }
       }
     }
     const headerFooter = new Set();
-    for (const [k, v] of Object.entries(hfCounter)) if (v >= minRepeat) headerFooter.add(k);
+    for (const [k, st] of Object.entries(hfStats)) {
+      if (st.count >= minRepeat) {
+        st.heights.sort((a, b) => a - b);
+        st.typH = st.heights[Math.floor(st.heights.length / 2)];
+        headerFooter.add(k);
+      }
+    }
 
     const candidates = [];
     let diseaseCount = 0;
@@ -1372,12 +1432,31 @@
 
       let text = rawText.replace(/^\[附\]\s*/, '').replace(/\s*[|｜丨]\s*/g, ' ').trim();
       if (!text) continue;
-      if (headerFooter.has(normalizeHF(rawText))) continue;
+
+      const num = matchNumbering(rawText);
+      const level = num ? num.level : 0;
+
+      // 页眉页脚：常规页眉（如左上/右上角的章名）忽略；
+      // 但字号明显大于常规页眉且带编号的行，是章/节在页面顶部的开头标题，保留
+      let openingTitle = false;
+      const hfKey = normalizeHF(rawText);
+      if (headerFooter.has(hfKey)) {
+        const st = hfStats[hfKey];
+        openingTitle = !!(num && st && st.typH &&
+          line.height >= st.typH * 1.5 && line.height >= medianH * 1.2);
+        if (!openingTitle) continue;
+      }
+
+      // 行内小标题：从“标题+正文”的合并行中切出标题部分
+      let inLine = false;
+      const ri = splitRunInHeading(line);
+      if (ri && ri.title.length < text.length) {
+        text = ri.title;
+        inLine = true;
+      }
 
       const hRatio = line.height / medianH;
       const len = text.length;
-      const num = matchNumbering(rawText);
-      const level = num ? num.level : 0;
       if (num && level > maxLevel) continue;
 
       let score = 0;
@@ -1388,6 +1467,8 @@
       else if (hRatio < 0.88) score -= 2;
 
       if (num) { score += num.bonus; reasons.push(num.type); }
+      if (inLine) { score += 1; reasons.push('行内小标题'); }
+      if (openingTitle) { score += 2; reasons.push('章开头标题'); }
 
       if (len < 2) score -= 6;
       else if (len <= 22) score += 1;
@@ -1410,10 +1491,17 @@
       if (onlyDisease && !ds.isDisease) continue;
 
       if (score >= cfg.minScore) {
-        let displayTitle = text
-          .replace(/^第[一二三四五六七八九十百千零\d]+[章篇部节]\s*/, '')
-          .replace(/^\[附\]\s*/, '').trim();
-        if (displayTitle.length < 2) displayTitle = text;
+        // 章级条目标题保留“第X章”（便于在列表/拆分点中看到章节开头），
+        // 其余层级仍去掉“第X节”等编号前缀
+        let displayTitle;
+        if (level === 1) {
+          displayTitle = text.replace(/^(第[一二三四五六七八九十百千零〇\d]+\s*[章篇部])\s*/, '$1 ');
+        } else {
+          displayTitle = text
+            .replace(/^第[一二三四五六七八九十百千零〇\d]+[章篇部节]\s*/, '')
+            .replace(/^\[附\]\s*/, '').trim();
+          if (displayTitle.length < 2) displayTitle = text;
+        }
 
         if (ds.isDisease) diseaseCount++;
 
@@ -1954,6 +2042,10 @@
 
       if (cancelRequested) { toast('已取消'); renderDetected(); return; }
 
+      emptyHintOverride = (!detected.length && $('autoOnlyDisease').checked)
+        ? '未识别到疾病标题。若为教材或非疾病目录，可取消勾选右侧“只保留疾病标题”后重新识别。'
+        : '';
+
       const parts = [`扫描 ${allLines.length} 行`, `本地 ${localCount} 条(疾病${diseaseCount})`];
       if (outlineTotal) parts.push(`书签 ${outlineAdded}/${outlineTotal} 条`);
       if (tocTotal) parts.push(`目录 ${tocAdded}/${tocTotal} 条${tocOffset ? `(偏移${tocOffset > 0 ? '+' : ''}${tocOffset})` : ''}`);
@@ -2094,7 +2186,7 @@
       listEl.classList.add('hidden');
       $('autoEmpty').innerHTML = (detected.length && currentLevelFilter !== 'all')
         ? '该层级没有识别结果，请切换到“全部”查看。'
-        : EMPTY_HINT_HTML;
+        : (emptyHintOverride || EMPTY_HINT_HTML);
       updateSelectionStats(items);
       return;
     }
